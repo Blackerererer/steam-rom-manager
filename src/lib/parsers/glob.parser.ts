@@ -1,6 +1,6 @@
 import { ParserInfo, GenericParser, UserConfiguration, ParsedData } from '../../models';
 import { APP } from '../../variables';
-import * as glob from 'glob';
+import { glob } from 'glob';
 import * as path from 'path';
 import * as _ from "lodash";
 import * as minimatch from 'minimatch';
@@ -8,13 +8,13 @@ import * as minimatch from 'minimatch';
 interface TitleTagData {
   depth: {
     direction: 'left' | 'right',
-      level: number
+    level: number
   },
-    finalGlob: string,
-    titleRegex: {
-      regex: RegExp,
-        pos: number
-    }
+  finalGlob: string,
+  titleRegex: {
+    regex: RegExp,
+    pos: number
+  }
 }
 
 export class GlobParser implements GenericParser {
@@ -25,6 +25,8 @@ export class GlobParser implements GenericParser {
       inputs: {
         'glob': {
           label: this.lang.inputTitle,
+          placeholder: this.lang.inputPlaceholder,
+          required: true,
           inputType: 'text',
           validationFn: this.validate.bind(this),
           info: this.lang.docs__md.input.join('')
@@ -37,7 +39,7 @@ export class GlobParser implements GenericParser {
     return APP.lang.globParser;
   }
 
-  private validate(fileGlob: string, suppressSlashError: boolean = false) {
+  private validate(fileGlob: string) {
     let testRegExpr = /(\${title})/gi;
     let match = testRegExpr.exec(fileGlob);
     if (match === null)
@@ -46,74 +48,67 @@ export class GlobParser implements GenericParser {
       return this.lang.errors.moreThanOneTitle__md;
 
     testRegExpr = /.*\*\${title}.*|.*\${title}\*.*/i;
-    match = testRegExpr.exec(fileGlob);
-    if (match !== null)
-      return this.lang.errors.noStarNextToTitle__md;
+match = testRegExpr.exec(fileGlob);
+if (match !== null)
+  return this.lang.errors.noStarNextToTitle__md;
 
-    testRegExpr = /.*\?\${title}.*|.*\${title}\?.*/i;
-    match = testRegExpr.exec(fileGlob);
-    if (match !== null)
-      return this.lang.errors.noAnyCharNextToTitle__md;
+testRegExpr = /.*\?\${title}.*|.*\${title}\?.*/i;
+match = testRegExpr.exec(fileGlob);
+if (match !== null)
+  return this.lang.errors.noAnyCharNextToTitle__md;
 
-    if (!suppressSlashError) {
-      testRegExpr = /\\/;
-      match = testRegExpr.exec(fileGlob);
-      if (match !== null)
-        return this.lang.errors.noWindowsSlash__md;
+testRegExpr = /.*\*\*.+\${title}.+\*\*.*/i;
+match = testRegExpr.exec(fileGlob);
+if (match !== null)
+  return this.lang.errors.noGlobstarOnBothSides__md;
+
+testRegExpr = /.*\{.*?\/+.*?\}.*\${title}.*\{.*?\/+.*?\}.*/i;
+match = testRegExpr.exec(fileGlob);
+if (match !== null)
+  return this.lang.errors.noBracedDirSetOnBothSides__md;
+
+testRegExpr = /.*\{.*?\/+.*?\}.*\${title}.+\*\*.*|.*\*\*.+\${title}.*\{.*?\/+.*?\}.*/i;
+match = testRegExpr.exec(fileGlob);
+if (match !== null)
+  return this.lang.errors.noBracedDirSetOrGlobstarOnBothSides__md;
+
+testRegExpr = /(\?|!|\+|\*|@)\((.*?)\)/gi;
+while ((match = testRegExpr.exec(fileGlob)) !== null) {
+  if (match[2].length === 0)
+    return this.lang.errors.noEmptyPattern__md;
+}
+
+testRegExpr = /\[(.*?)\]/g;
+while ((match = testRegExpr.exec(fileGlob)) !== null) {
+  if (match[1].length === 0)
+    return this.lang.errors.noEmptyCharRange__md;
+}
+
+testRegExpr = /.*(\?|!|\+|\*|@)\((.+?)\)\${title}(\?|!|\+|\*|@)\((.+?)\).*|.*(\?|!|\+|\*|@)\((.+?)\)\${title}.*|.*\${title}(\?|!|\+|\*|@)\((.+?)\).*/i;
+match = testRegExpr.exec(fileGlob);
+if (match !== null) {
+  let patterns: string[];
+  if (match[2] || match[6]) {
+    patterns = (match[2] || match[6]).split('|');
+    for (let i = 0; i < patterns.length; i++) {
+      if (patterns[i][patterns[i].length - 1] === '*')
+        return this.lang.errors.noStarInPatternNextToTitle__md;
+      else if (patterns[i][patterns[i].length - 1] === '?')
+        return this.lang.errors.noAnyCharInPatternNextToTitle__md;
     }
-
-    testRegExpr = /.*\*\*.+\${title}.+\*\*.*/i;
-    match = testRegExpr.exec(fileGlob);
-    if (match !== null)
-      return this.lang.errors.noGlobstarOnBothSides__md;
-
-    testRegExpr = /.*\{.*?\/+.*?\}.*\${title}.*\{.*?\/+.*?\}.*/i;
-    match = testRegExpr.exec(fileGlob);
-    if (match !== null)
-      return this.lang.errors.noBracedDirSetOnBothSides__md;
-
-    testRegExpr = /.*\{.*?\/+.*?\}.*\${title}.+\*\*.*|.*\*\*.+\${title}.*\{.*?\/+.*?\}.*/i;
-    match = testRegExpr.exec(fileGlob);
-    if (match !== null)
-      return this.lang.errors.noBracedDirSetOrGlobstarOnBothSides__md;
-
-    testRegExpr = /(\?|!|\+|\*|@)\((.*?)\)/gi;
-    while ((match = testRegExpr.exec(fileGlob)) !== null) {
-      if (match[2].length === 0)
-        return this.lang.errors.noEmptyPattern__md;
+  }
+  else if (match[4] || match[8]) {
+    patterns = (match[4] || match[8]).split('|');
+    for (let i = 0; i < patterns.length; i++) {
+      if (patterns[i][0] === '*')
+        return this.lang.errors.noStarInPatternNextToTitle__md;
+      else if (patterns[i][0] === '?')
+        return this.lang.errors.noAnyCharInPatternNextToTitle__md;
     }
+  }
+}
 
-    testRegExpr = /\[(.*?)\]/g;
-    while ((match = testRegExpr.exec(fileGlob)) !== null) {
-      if (match[1].length === 0)
-        return this.lang.errors.noEmptyCharRange__md;
-    }
-
-    testRegExpr = /.*(\?|!|\+|\*|@)\((.+?)\)\${title}(\?|!|\+|\*|@)\((.+?)\).*|.*(\?|!|\+|\*|@)\((.+?)\)\${title}.*|.*\${title}(\?|!|\+|\*|@)\((.+?)\).*/i;
-    match = testRegExpr.exec(fileGlob);
-    if (match !== null) {
-      let patterns: string[];
-      if (match[2] || match[6]) {
-        patterns = (match[2] || match[6]).split('|');
-        for (let i = 0; i < patterns.length; i++) {
-          if (patterns[i][patterns[i].length - 1] === '*')
-            return this.lang.errors.noStarInPatternNextToTitle__md;
-          else if (patterns[i][patterns[i].length - 1] === '?')
-            return this.lang.errors.noAnyCharInPatternNextToTitle__md;
-        }
-      }
-      else if (match[4] || match[8]) {
-        patterns = (match[4] || match[8]).split('|');
-        for (let i = 0; i < patterns.length; i++) {
-          if (patterns[i][0] === '*')
-            return this.lang.errors.noStarInPatternNextToTitle__md;
-          else if (patterns[i][0] === '?')
-            return this.lang.errors.noAnyCharInPatternNextToTitle__md;
-        }
-      }
-    }
-
-    return null;
+return null;
   }
 
   private getTitleDepth(fileGlob: string) {
@@ -123,8 +118,8 @@ export class GlobParser implements GenericParser {
       depth.level = null;
     }
     else if (/.*(?:\*\*|\{.*?\/+.*?\}).+\${title}.*/i.test(fileGlob)) {
-      depth.direction = 'right';
-      tempGlob = fileGlob.replace(/.*\${title}/i, '');
+depth.direction = 'right';
+tempGlob = fileGlob.replace(/.*\${title}/i, '');
     }
     else {
       depth.direction = 'left';
@@ -147,7 +142,7 @@ export class GlobParser implements GenericParser {
       if (mm.empty)
         return '^\\s*?$';
       else{
-        return mm.makeRe().source;
+        return (mm.makeRe()||{}).source;
       }
     }
 
@@ -208,7 +203,7 @@ export class GlobParser implements GenericParser {
   private extractTitles(titleData: TitleTagData, directory: string, files: string[]) {
     let parsedData: ParsedData = { success: [], failed: [] };
     for (let i = 0; i < files.length; i++) {
-      let title = this.extractTitle(titleData, files[i]);
+      let title = this.extractTitle(titleData, files[i].replace(/\\/g,'/'));
       let filePath = files[i].replace(/\\|\//g, path.sep);
       filePath = path.isAbsolute(filePath) ? filePath : path.join(directory, filePath);
       if (title !== undefined)
@@ -219,21 +214,16 @@ export class GlobParser implements GenericParser {
     return parsedData;
   }
 
-  execute(directories: string[], inputs: { [key: string]: any }, cache?: { [key: string]: any }) {
-    let directory = directories[0];
-    return Promise.resolve().then(() => {
-      let validationText = this.validate(inputs['glob']);
+  execute(directories: string[], inputs: { [key: string]: any }) {
+    const directory = directories[0];
+    return new Promise<ParsedData>((resolve,reject)=> {
+      const validationText = this.validate(inputs['glob']);
       if (validationText === null) {
-        let titleData = this.extractTitleTag(inputs['glob']);
-        return new Promise((resolve, reject) => {
-          glob(titleData.finalGlob, { silent: true, dot: true, cwd: directory, cache: cache || {} }, (err, files) => {
-            if (err)
-              reject(err);
-            else
-              resolve(files);
-          });
-        }).then((files: string[]) => {
-          return this.extractTitles(titleData, directory, files);
+        const titleData = this.extractTitleTag(inputs['glob']);
+        glob(titleData.finalGlob, { dot: true, cwd: directory, follow: true }).then((files: string[]) => {
+          resolve(this.extractTitles(titleData, directory, files));
+        }).catch((err: string) => {
+          reject(err);
         })
       }
       else

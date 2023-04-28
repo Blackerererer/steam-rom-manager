@@ -5,15 +5,18 @@
     }
   },
   "compilerOptions": {
-    "target": "es2019",
+    "target": "es2022",
     "module": "ESNext",
     "sourceMap": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "removeComments": false,
     "noImplicitAny": true,
-    "suppressImplicitAnyIndexErrors": true,
-    "moduleResolution": "Node"
+    "moduleResolution": "Node",
+    "esModuleInterop": true
+  },
+  "angularCompilerOptions": {
+    "preserveWhitespaces": false
   },
   "include": ["./*.ts", "./src/**/*.ts"]
 }

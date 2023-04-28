@@ -1,47 +1,52 @@
-@import 'mixins';
+@import "mixins";
 
 ng-nested-form {
-  &.nested{
+  &.nested {
     background-color: transparent;
   }
 
   .container {
     display: grid;
 
-    margin: 0 0 0.5em 0;
+    margin: 0.5em 0 0.5em 0;
 
-    &.nested{
+    &.nested {
       margin: 0;
     }
 
-    grid-template-areas: 'label label'
-    'input button'
-    'error error';
+    grid-template-areas:
+      "label label"
+      "input button"
+      "error error";
     grid-template-columns: 1fr auto;
 
     label {
       display: flex;
 
       margin: 0 0 0.35em 0;
-
+      font-weight: var(--font-weight-nested-form-label);
+      text-transform: var(--font-transform-nested-form-label);
+      font-size: var(--font-size-nested-form-label);
       color: var(--color-nested-form-label);
 
       align-items: center;
       grid-area: label;
 
       .infoButton {
-        margin: 0 0.25em 0 0;
+        margin: var(--margin-info-button);
+        order: var(--order-info-button);
       }
     }
     &.section {
       margin-top: 2em;
-      border-bottom: .1em solid;
+      margin-bottom: 1em;
+      border-bottom: 0.1em solid;
       border-bottom-color: var(--color-nested-form-label);
       label {
         svg {
           height: 1.2em;
           width: 1em;
-          margin-bottom:-4px;
+          margin-bottom: -4px;
           margin-left: -5px;
           polyline {
             stroke: var(--color-nested-form-label);
@@ -51,12 +56,15 @@ ng-nested-form {
     }
 
     .errorMessage {
-      margin-top: 0.25em;
+      margin: var(--margin-nested-form-error);
 
       background-color: var(--color-nested-form-error-background);
 
       blockquote {
-        border-left-color: var(--color-nested-form-error);
+        border-left-color: var(--color-nested-form-error-border);
+        p{color: var(--color-nested-form-error)}
+        margin: var(--margin-nested-form-error);
+        padding: var(--padding-nested-form-error);
       }
 
       grid-area: error;
@@ -69,29 +77,43 @@ ng-nested-form {
       justify-content: center;
     }
     .clickButton {
+      @include clickButtonColor(click-button, true);
       @include button();
-      @include clickButtonColor(click-button);
-
       margin: 0 0 0 0.25em;
-
       grid-area: button;
+      margin-bottom: var(--margin-input-text);
     }
-
+    .reqText {
+      margin-left: 0.25em;
+    }
     ng-text-input {
       @include ngTextInput();
       @include ngTextInputColor(input, true);
-
       grid-area: input;
+      &.required {
+        outline: 1px solid var(--color--required);
+        .display{
+          border: 0
+        }
+      }
     }
 
     ng-select {
       grid-area: input;
+      &.required {
+        outline: 1px solid var(--color--required);
+        .display{
+          border: 0
+        }
+      }
     }
 
     ng-toggle-button {
       @include ngToggleButtonColor(ng-toggle-button);
 
       grid-area: input;
+      + ng-toggle-button {
+      }
     }
   }
 

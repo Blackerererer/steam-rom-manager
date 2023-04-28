@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { AppSettings } from "../../models";
 import { LoggerService } from './logger.service';
 import { Subject, BehaviorSubject } from "rxjs";
+import { takeWhile } from "rxjs/operators";
 import { APP } from '../../variables';
 import * as json from "../../lib/helpers/json";
 import * as file from "../../lib/helpers/file";
@@ -30,7 +31,7 @@ export class SettingsService {
         }));
       }
       else {
-        this.appSettings =settings;
+        this.appSettings = settings;
       }
     }).catch((error) => {
       this.loggerService.error(this.lang.error.readingError, { invokeAlert: true, alertTimeout: 3000 });
@@ -57,7 +58,7 @@ export class SettingsService {
   }
 
   saveAppSettings() {
-    if (!this.savingIsDisabled){
+    if (!this.savingIsDisabled) {
       json.write(paths.userSettings, this.appSettings).then().catch((error) => {
         this.loggerService.error(this.lang.error.writingError, { invokeAlert: true, alertTimeout: 3000 });
         this.loggerService.error(error);
@@ -70,11 +71,10 @@ export class SettingsService {
   }
 
   onLoad(callback: (appSettings: AppSettings) => void) {
-    this.settingsLoadedSubject.asObservable().takeWhile((loaded) => {
+    this.settingsLoadedSubject.asObservable().pipe(takeWhile((loaded: boolean) => {
       if (loaded)
         callback(this.appSettings);
-
       return !loaded;
-    }).subscribe();
+    })).subscribe();
   }
 }

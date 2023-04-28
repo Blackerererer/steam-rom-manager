@@ -2,7 +2,11 @@ import { userAccountData, StringLiteralArray } from './helpers.model';
 import { Controllers } from './controllers.model';
 import { ImageProviderAPI } from './user-configuration.model';
 
-export interface ParsedUserConfigurationFile {
+export interface StringMap {
+  [key: string]: any
+}
+
+export interface ParsedUserConfigurationFile extends StringMap {
   executableLocation: string,
   modifiedExecutableLocation: string,
   startInDirectory: string,
@@ -11,29 +15,21 @@ export interface ParsedUserConfigurationFile {
   fuzzyTitle: string,
   finalTitle: string,
   argumentString: string,
-  resolvedLocalImages: string[],
-  resolvedLocalTallImages: string[],
-  resolvedLocalHeroImages: string[],
-  resolvedLocalLogoImages: string[],
-  resolvedLocalIcons: string[],
   onlineImageQueries: string[],
   steamCategories: string[],
   imagePool: string,
-  resolvedDefaultImages: string[],
-  resolvedDefaultTallImages: string[],
-  resolvedDefaultHeroImages: string[],
-  resolvedDefaultLogoImages: string[],
-  resolvedDefaultIcons: string[],
-  defaultImage: string,
-  defaultTallImage: string,
-  defaultHeroImage: string,
-  defaultLogoImage: string,
-  defaultIcon: string,
-  localImages: string[],
-  localTallImages: string[],
-  localHeroImages: string[],
-  localLogoImages: string[],
-  localIcons: string[]
+  defaultImage: {
+    [artworkType: string]: string
+  },
+  localImages: {
+    [artworkType: string]: string[]
+  },
+  resolvedDefaultImages: {
+    [artworkType: string]: string[]
+  },
+  resolvedLocalImages: {
+    [artworkType: string]: string[]
+  }
 }
 
 export interface ParsedUserConfiguration {
@@ -56,17 +52,13 @@ export interface ParsedUserConfiguration {
 export interface ParserInputField {
   [inputKey: string]: {
     label: string,
+    placeholder?: string,
     inputType: 'text' | 'path' | 'dir' | 'toggle',
+    required?: boolean,
     info?: string,
     forcedInput?: string,
-    validationFn?: (inputData: any, suppressSlashError?: boolean) => null | string
+    validationFn?: (inputData: any) => null | string
   }
-}
-
-export interface ParserInfo {
-  title: string,
-  info?: string,
-  inputs?: ParserInputField
 }
 
 
@@ -114,6 +106,17 @@ export type PathVariables = (typeof pathVariables)[number];
 export type ParserVariables = (typeof parserVariables)[number];
 export type EnvironmentVariables = (typeof environmentVariables)[number];
 
+
+
+
+export type ParserType = 'Glob' | 'Glob-regex' | 'Manual' | 'Amazon Games' | 'Epic' | 'Legendary' | 'GOG Galaxy' | 'itch.io' | 'Steam' | 'UPlay' | 'UWP' | 'EA Desktop';
+export type SuperType = 'Manual'|'ArtworkOnly'|'ROM'|'Platform';
+
+export interface ParserInfo {
+  title: ParserType,
+  info?: string,
+  inputs?: ParserInputField
+}
 
 
 export type AllVariables = DirectoryVariables | NameVariables | ExtensionVariables | PathVariables | ParserVariables | EnvironmentVariables;

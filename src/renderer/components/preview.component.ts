@@ -1,23 +1,17 @@
 import { Component, ChangeDetectionStrategy, ChangeDetectorRef, OnDestroy, Renderer2, ElementRef, RendererStyleFlags2, HostListener } from '@angular/core';
-import { Subscription } from 'rxjs';
-import { PreviewService, SettingsService, ImageProviderService } from "../services";
-import { PreviewData, PreviewDataApp, PreviewVariables, AppSettings, ImageContent, SelectItem } from "../../models";
+import { ActivatedRoute } from '@angular/router';
+import { Subscription, BehaviorSubject } from 'rxjs';
+import { PreviewService, SettingsService, ImageProviderService, IpcService, UserExceptionsService } from "../services";
+import { PreviewData, PreviewDataApp, PreviewDataApps, PreviewVariables, AppSettings, ImageContent, SelectItem, UserConfiguration } from "../../models";
 import { APP } from '../../variables';
 import { FileSelector } from '../../lib';
+import { artworkTypes, artworkViewTypes, artworkNamesDict, artworkDimsDict } from '../../lib/artwork-types';
 import * as url from '../../lib/helpers/url';
 import * as FileSaver from 'file-saver';
 import * as appImage from '../../lib/helpers/app-image';
+import * as steam from '../../lib/helpers/steam';
 import * as _ from 'lodash';
 import * as path from 'path';
-
-const imageTypeDict = {
-  long: 'Banners',
-  tall: 'Portraits',
-  hero: 'Heroes',
-  logo: 'Logos',
-  icon: 'Icons',
-  games: 'All Artwork'
-};
 
 @Component({
   selector: 'preview',
@@ -38,10 +32,44 @@ export class PreviewComponent implements OnDestroy {
   private allParsers: string[] = [];
   private actualParserFilter: string[] = [];
   private imageTypes: SelectItem[];
+  private artworkTypes: string[] = artworkTypes;
   private scrollingEntries: boolean = false;
   private fileSelector: FileSelector = new FileSelector();
+  private CLI_MESSAGE: BehaviorSubject<string> = new BehaviorSubject("");
 
-  constructor(private previewService: PreviewService, private settingsService: SettingsService, private imageProviderService: ImageProviderService, private changeDetectionRef: ChangeDetectorRef, private renderer: Renderer2, private elementRef: ElementRef) {
+  private detailsApp: {
+    app: PreviewDataApp,
+    userId: string,
+    steamDirectory: string,
+    appId: string
+  };
+  private matchFix: string = '';
+  private matchFixIds: string[] = []
+  private matchFixDict: {[sgdbId: string]: {name: string, posterUrl: string}};
+  private detailsLoading: boolean = true;
+  private showDetails: boolean = false;
+
+  private showExcludes: boolean = false;
+  private excludedAppIds: {
+    [steamDirectory: string]: {
+      [userId: string]: {
+        [appId: string]: boolean
+      }
+    }
+  } = {};
+  private exclusionCount: number = 0;
+
+  constructor(
+    private previewService: PreviewService,
+    private settingsService: SettingsService,
+    private imageProviderService: ImageProviderService,
+    private userExceptionsService: UserExceptionsService,
+    private changeDetectionRef: ChangeDetectorRef,
+    private renderer: Renderer2,
+    private elementRef: ElementRef,
+    private activatedRoute: ActivatedRoute,
+    private ipcService: IpcService
+  ) {
     this.previewData = this.previewService.getPreviewData();
     this.previewVariables = this.previewService.getPreviewVariables();
     if(this.previewService.getPreviewData()) {
@@ -50,52 +78,46 @@ export class PreviewComponent implements OnDestroy {
       this.previewData = this.previewService.getPreviewData();
     }
     this.subscriptions.add(this.previewService.getPreviewDataChange().subscribe(_.debounce(() => {
-
       this.allCategories = this.previewService.getAllCategories();
       this.allParsers = this.previewService.getAllParsers();
       this.previewData = this.previewService.getPreviewData();
       this.changeDetectionRef.detectChanges();
     }, 50)));
     this.appSettings = this.settingsService.getSettings();
-    this.imageTypes = this.previewService.getImageTypes().map((imageType: string)=>{
-      return {value: imageType, displayValue: imageTypeDict[imageType]}
+    this.imageTypes = artworkViewTypes.map((imageType: string)=>{
+      return {value: imageType, displayValue: artworkNamesDict[imageType]}
+    });
+    this.activatedRoute.queryParamMap.subscribe((paramContainer: any)=> {
+      let params = ({...paramContainer} as any).params;
+      if(params['cliMessage']) {
+        this.CLI_MESSAGE.next(params['cliMessage']);
+      }
     });
   }
 
   generatePreviewData() {
+    this.closeDetails();
+    this.cancelExcludes();
     this.previewService.generatePreviewData();
   }
 
   preloadImages() {
     this.previewService.preloadImages();
   }
+
   setImageBoxSizes() {
-    if(this.previewService.getImageType()=='long') {
-      this.renderer.setStyle(this.elementRef.nativeElement, '--image-width-max', '920px', RendererStyleFlags2.DashCase);
-      this.renderer.setStyle(this.elementRef.nativeElement, '--image-height-max', '430px', RendererStyleFlags2.DashCase);
-    } else if(this.previewService.getImageType()=='tall') {
-      this.renderer.setStyle(this.elementRef.nativeElement, '--image-width-max', '600px', RendererStyleFlags2.DashCase);
-      this.renderer.setStyle(this.elementRef.nativeElement, '--image-height-max', '900px', RendererStyleFlags2.DashCase);
-    } else if(this.previewService.getImageType()=='hero') {
-      this.renderer.setStyle(this.elementRef.nativeElement, '--image-width-max', '910px', RendererStyleFlags2.DashCase);
-      this.renderer.setStyle(this.elementRef.nativeElement, '--image-height-max', '296px', RendererStyleFlags2.DashCase);
-    } else if(this.previewService.getImageType()=='logo') {
-      this.renderer.setStyle(this.elementRef.nativeElement, '--image-width-max', '960px', RendererStyleFlags2.DashCase);
-      this.renderer.setStyle(this.elementRef.nativeElement, '--image-height-max', '540px', RendererStyleFlags2.DashCase);
-    } else if(this.previewService.getImageType()=='icon') {
-      this.renderer.setStyle(this.elementRef.nativeElement, '--image-width-max', '400px', RendererStyleFlags2.DashCase);
-      this.renderer.setStyle(this.elementRef.nativeElement, '--image-height-max', '400px', RendererStyleFlags2.DashCase);
-    } else if(this.previewService.getImageType()=='games') {
-      this.renderer.setStyle(this.elementRef.nativeElement, '--image-width-max', '920px', RendererStyleFlags2.DashCase);
-      this.renderer.setStyle(this.elementRef.nativeElement, '--image-height-max', '430px', RendererStyleFlags2.DashCase);
-    }
+    const currentType = this.previewService.getImageType();
+    this.renderer.setStyle(this.elementRef.nativeElement, '--image-width-max', artworkDimsDict[currentType].width, RendererStyleFlags2.DashCase);
+    this.renderer.setStyle(this.elementRef.nativeElement, '--image-height-max', artworkDimsDict[currentType].height, RendererStyleFlags2.DashCase);
   }
+
   setCategoryFilter(categories: string[]) {
     this.categoryFilter = categories;
     this.actualCategoryFilter = categories.map(c=>c.replace(/&nbsp;/g,' '));
   }
+
   setParserFilter(parsers: string[]) {
-    this.parserFilter= parsers;
+    this.parserFilter = parsers;
     this.actualParserFilter = parsers.map(p=>p.replace(/&nbsp;/g,' '));
   }
 
@@ -103,6 +125,49 @@ export class PreviewComponent implements OnDestroy {
     this.setImageSize(this.appSettings.previewSettings.imageZoomPercentage);
     this.setImageBoxSizes();
   }
+
+  ngAfterViewInit() {
+    this.subscriptions.add(this.CLI_MESSAGE.asObservable().subscribe((cliMessage: string)=> {
+      const parsedCLI = cliMessage ? JSON.parse(cliMessage)||{} : {};
+      let hasrun = false;
+      if(['add','remove'].includes(parsedCLI.command)) {
+        this.previewService.onLoadUserConfigurations((userConfigurations: UserConfiguration[])=> {
+          this.ipcService.send('log','Generating app list')
+          this.generatePreviewData();
+        });
+        this.previewService.getPreviewDataChange().subscribe(()=>{
+          let previewVariables = this.previewService.getPreviewVariables();
+          if(this.previewVariables.listHasGenerated && this.previewVariables.numberOfListItems > 0) {
+            this.ipcService.send('inline-log',`Apps: ${this.previewVariables.numberOfListItems}. Remaining images: ${this.previewVariables.numberOfQueriedImages}`);
+            if(this.previewVariables.numberOfQueriedImages == 0 && !hasrun) {
+              hasrun = true;
+              this.ipcService.send('log','')
+              if(parsedCLI.command == 'add') {
+                this.ipcService.send('log', 'Adding app list to steam');
+                this.save().then(()=>{
+                  this.ipcService.send('all_done');
+                })
+              } else {
+                this.ipcService.send('log', 'Removing app list from steam');
+                this.remove().then(()=>{
+                  this.ipcService.send('all_done');
+                })
+              }
+            }
+          } else if(this.previewVariables.listHasGenerated){
+            this.ipcService.send('log', 'No apps found');
+            this.ipcService.send('all_done');
+          }
+        })
+        this.previewService.getBatchProgress().subscribe(({update, batch}: {update: string, batch: number})=>{
+          if(batch > -1) {
+            this.ipcService.send('inline-log', update);
+          }
+        })
+      }
+    }))
+  }
+
   ngOnDestroy() {
     this.subscriptions.unsubscribe();
   }
@@ -115,43 +180,31 @@ export class PreviewComponent implements OnDestroy {
     this.previewService.setImageType(imageType);
     this.setImageBoxSizes();
   }
-  private getImagePool(poolKey: string, imagetype?: string) {
-    return this.previewService.getImages(imagetype)[poolKey];
+
+  private getImagePool(poolKey: string, imageType?: string) {
+    return this.previewService.getImages(imageType)[poolKey];
   }
 
-  private getAppImages(app: PreviewDataApp, imagetype?: string) {
-    if (this.previewService.getImageType() === 'long' || (this.previewService.getImageType() === 'games' && imagetype ==='long')) {
-      return app.images;
-    } else if (this.previewService.getImageType() === 'tall' || (this.previewService.getImageType() === 'games' && imagetype ==='tall')) {
-      return app.tallimages;
-    } else if (this.previewService.getImageType() === 'hero' || (this.previewService.getImageType() === 'games' && imagetype ==='hero')) {
-      return app.heroimages;
-    } else if (this.previewService.getImageType() === 'logo' || (this.previewService.getImageType() === 'games' && imagetype ==='logo')) {
-      return app.logoimages;
-    } else if (this.previewService.getImageType() === 'icon' || (this.previewService.getImageType() === 'games' && imagetype ==='icon')) {
-      return app.icons;
-    }
+  private getAppImages(app: PreviewDataApp, imageType?: string) {
+
+    const actualImageType = this.previewService.getImageType() === 'games' ? imageType : this.previewService.getImageType();
+    return app.images[actualImageType];
   }
 
-  private getBackgroundImage(app: PreviewDataApp, imagetype?: string) {
-    return this.previewService.getCurrentImage(app, imagetype);
+  private getBackgroundImage(app: PreviewDataApp, imageType?: string) {
+    return this.previewService.getCurrentImage(app, imageType);
   }
 
-  private setBackgroundImage(app: PreviewDataApp, image: ImageContent, imagetype?: string) {
+  private setDetailsBackgroundImage(sgdbId: string) {
+    const posterUrl = this.matchFixDict[sgdbId].posterUrl;
+    return posterUrl ? posterUrl : require('../../assets/images/no-images.svg');
+  }
+
+  private setBackgroundImage(app: PreviewDataApp, image: ImageContent, imageType?: string) {
     if (image == undefined) {
-      let imagepool: string;
-      if (this.previewService.getImageType()==='long' || (this.previewService.getImageType()==='games' && imagetype==='long')) {
-        imagepool = app.tallimages.imagePool;
-      } else if (this.previewService.getImageType()==='tall' || (this.previewService.getImageType()==='games' && imagetype==='tall')) {
-        imagepool = app.tallimages.imagePool;
-      } else if (this.previewService.getImageType()==='hero' || (this.previewService.getImageType()==='games' && imagetype==='hero')) {
-        imagepool = app.heroimages.imagePool;
-      } else if (this.previewService.getImageType()==='logo' || (this.previewService.getImageType()==='games' && imagetype==='logo')) {
-        imagepool = app.logoimages.imagePool;
-      } else if (this.previewService.getImageType()==='icon' || (this.previewService.getImageType()==='games' && imagetype==='icon')) {
-        imagepool = app.icons.imagePool;
-      }
-      if (this.previewService.getImages(imagetype)[imagepool].retrieving)
+      const actualImageType = this.previewService.getImageType() === 'games' ? imageType : this.previewService.getImageType();
+      let imagepool: string = app.images[actualImageType].imagePool;
+      if (this.previewService.getImages(imageType)[imagepool].retrieving)
         return require('../../assets/images/retrieving-images.svg');
       else
         return require('../../assets/images/no-images.svg');
@@ -159,7 +212,7 @@ export class PreviewComponent implements OnDestroy {
     else {
       if (image.loadStatus === 'notStarted') {
         if(this.previewService.getImageType()==='games') {
-          this.loadImage(app, imagetype)
+          this.loadImage(app, imageType)
         } else {
           this.loadImage(app);
         }
@@ -175,41 +228,30 @@ export class PreviewComponent implements OnDestroy {
     }
   }
 
-  private loadImage(app: PreviewDataApp, imagetype?: string) {
-    this.previewService.loadImage(app, imagetype);
+  private loadImage(app: PreviewDataApp, imageType?: string) {
+    this.previewService.loadImage(app, imageType);
   }
 
-  private areImagesAvailable(app: PreviewDataApp, imagetype?: string) {
-    return this.previewService.areImagesAvailable(app, imagetype);
+  private areImagesAvailable(app: PreviewDataApp, imageType?: string) {
+    return this.previewService.areImagesAvailable(app, imageType);
   }
 
-  private currentImageIndex(app: PreviewDataApp, imagetype?: string) {
-    if(this.previewService.getImageType()!='games') {
-      imagetype=this.previewService.getImageType()
+  private currentImageIndex(app: PreviewDataApp, imageType?: string) {
+    if(this.previewService.getImageType() !== 'games') {
+      imageType=this.previewService.getImageType()
     }
-    if (imagetype === 'long') {
-      return app.images.imageIndex + 1;
-    } else if (imagetype === 'tall') {
-      return app.tallimages.imageIndex + 1;
-    } else if (imagetype === 'hero') {
-      return app.heroimages.imageIndex + 1;
-    } else if (imagetype === 'logo') {
-      return app.logoimages.imageIndex + 1;
-    } else if (imagetype === 'icon') {
-      return app.icons.imageIndex + 1;
-    }
-
+    return app.images[imageType].imageIndex + 1;
   }
 
-  private maxImageIndex(app: PreviewDataApp, imagetype?: string) {
-    return this.previewService.getTotalLengthOfImages(app, imagetype);
+  private maxImageIndex(app: PreviewDataApp, imageType?: string) {
+    return this.previewService.getTotalLengthOfImages(app, imageType);
   }
 
-  private addLocalImages(app: PreviewDataApp, imagetype?: string) {
+  private addLocalImages(app: PreviewDataApp, imageType?: string) {
     this.fileSelector.multiple = true;
     this.fileSelector.accept = '.png, .jpeg, .jpg, .tga, .webp, .ico';
     if(this.previewService.getImageType()!='games') {
-      imagetype=this.previewService.getImageType()
+      imageType=this.previewService.getImageType()
     }
     this.fileSelector.onChange = (target) => {
       if (target.files) {
@@ -217,37 +259,11 @@ export class PreviewComponent implements OnDestroy {
         for (let i = 0; i < target.files.length; i++) {
           if (extRegex.test(path.extname(target.files[i].path))) {
             let imageUrl = url.encodeFile(target.files[i].path);
-            if (imagetype === 'long') {
-              this.previewService.addUniqueImage(app.images.imagePool, {
-                imageProvider: 'LocalStorage',
-                imageUrl,
-                loadStatus: 'done'
-              }, 'long');
-            } else if (imagetype === 'tall') {
-              this.previewService.addUniqueImage(app.tallimages.imagePool, {
-                imageProvider: 'LocalStorage',
-                imageUrl,
-                loadStatus: 'done'
-              }, 'tall');
-            } else if (imagetype === 'hero') {
-              this.previewService.addUniqueImage(app.heroimages.imagePool, {
-                imageProvider: 'LocalStorage',
-                imageUrl,
-                loadStatus: 'done'
-              }, 'hero');
-            } else if (imagetype === 'logo') {
-              this.previewService.addUniqueImage(app.logoimages.imagePool, {
-                imageProvider: 'LocalStorage',
-                imageUrl,
-                loadStatus: 'done'
-              }, 'logo');
-            } else if (imagetype === 'icon') {
-              this.previewService.addUniqueImage(app.icons.imagePool, {
-                imageProvider: 'LocalStorage',
-                imageUrl,
-                loadStatus: 'done'
-              }, 'icon');
-            }
+            this.previewService.addUniqueImage(app.images[imageType].imagePool, {
+              imageProvider: 'LocalStorage',
+              imageUrl: imageUrl,
+              loadStatus: 'done'
+            }, imageType);
           }
         }
       }
@@ -264,7 +280,7 @@ export class PreviewComponent implements OnDestroy {
   }
 
   private save() {
-    this.previewService.saveData(false);
+    return this.previewService.saveData({removeAll: false, batchWrite: true});
   }
 
   private remove() {
@@ -275,81 +291,171 @@ export class PreviewComponent implements OnDestroy {
         }
       }
     }
-    this.previewService.saveData(false).then((noError: boolean | void) => {
+    return this.previewService.saveData({removeAll: false, batchWrite: false}).then((noError: boolean | void) => {
       if (noError)
         this.previewService.clearPreviewData();
     });
   }
 
-  private refreshImages(app: PreviewDataApp, imagetype?: string) {
-    if(this.previewService.getImageType()=='games') {
-      this.previewService.downloadImageUrls(imagetype,[app.images.imagePool], app.imageProviders);
-    } else {
-      this.previewService.downloadImageUrls('long',[app.images.imagePool], app.imageProviders);
-      this.previewService.downloadImageUrls('tall',[app.tallimages.imagePool], app.imageProviders);
-      this.previewService.downloadImageUrls('hero',[app.heroimages.imagePool], app.imageProviders);
-      this.previewService.downloadImageUrls('logo',[app.logoimages.imagePool], app.imageProviders);
-      this.previewService.downloadImageUrls('icon',[app.icons.imagePool], app.imageProviders);
+  private changeAppDetails(app: PreviewDataApp, steamDirectory: string, userId: string, appId: string) {
+    this.detailsLoading = true;
+    this.showDetails= true;
+    this.matchFix = '';
+    this.renderer.setStyle(this.elementRef.nativeElement, '--details-width', '50%', RendererStyleFlags2.DashCase);
+    this.detailsApp = {
+      appId: appId,
+      app: app,
+      steamDirectory: steamDirectory,
+      userId: userId
+    };
+    this.previewService.getMatchFixes(this.detailsApp.app.extractedTitle).then((games: any[])=>{
+      this.matchFixDict = Object.fromEntries(games.map((x: any)=>[x.id.toString(), {name: x.name, posterUrl: x.posterUrl}]));
+      this.matchFixIds = games.map((x:any)=>x.id.toString());
+      this.detailsLoading = false;
+      this.changeDetectionRef.detectChanges();
+    })
+  }
+
+  private fixMatch(sgdbId: string) {
+    this.matchFix = sgdbId;
+  }
+  private closeDetails() {
+    this.matchFix = '';
+    this.detailsApp = undefined;
+    this.showDetails = false;
+    this.renderer.setStyle(this.elementRef.nativeElement, '--details-width','0%', RendererStyleFlags2.DashCase);
+    this.detailsLoading = false;
+  }
+
+  private saveDetails() {
+    if(this.detailsApp && this.matchFix) {
+      const {steamDirectory, userId, appId, app} = this.detailsApp;
+      this.previewData[steamDirectory][userId].apps[appId].title = this.matchFixDict[this.matchFix].name;
+      if(app.parserType !== 'Steam') {
+        const changedId = steam.generateAppId(app.executableLocation, this.matchFixDict[this.matchFix].name);
+        this.previewData[steamDirectory][userId].apps[appId].changedId = changedId;
+      }
+      const newPool = `\$\{gameid:${this.matchFix}\}`
+      for(const artworkType of artworkTypes) {
+        const oldPool = this.previewData[steamDirectory][userId].apps[appId].images[artworkType].imagePool;
+        this.previewData[steamDirectory][userId].apps[appId].images[artworkType].imagePool = newPool;
+        this.previewData[steamDirectory][userId].apps[appId].images[artworkType].steam = undefined;
+        this.previewService.updateAppImages(newPool, oldPool, artworkType)
+      }
+      const exceptionId = steam.generateShortAppId(app.executableLocation, app.extractedTitle)
+      const exceptionKey = `${app.extractedTitle} \$\{id:${exceptionId}\}`;
+      this.userExceptionsService.addException(exceptionKey, {
+        newTitle: this.matchFixDict[this.matchFix].name,
+        searchTitle: newPool,
+        commandLineArguments: '',
+        exclude: false,
+        excludeArtwork: false
+      })
+      this.refreshImages(this.previewData[steamDirectory][userId].apps[appId]);
+      this.closeDetails();
     }
   }
+
+  private excludeAppId(steamDirectory: string, userId: string, appId: string) {
+    if(this.showExcludes) {
+      if(!this.excludedAppIds[steamDirectory]) {
+        this.excludedAppIds[steamDirectory] = {};
+      }
+      if(!this.excludedAppIds[steamDirectory][userId]) {
+        this.excludedAppIds[steamDirectory][userId] = {};
+      }
+      if(this.excludedAppIds[steamDirectory][userId][appId]) {
+        this.excludedAppIds[steamDirectory][userId][appId] = false;
+        this.exclusionCount -= 1;
+      } else {
+        this.excludedAppIds[steamDirectory][userId][appId] = true;
+        this.exclusionCount += 1;
+      }
+    }
+  }
+
+  private showExclusions() {
+    this.showExcludes = true;
+  }
+
+  private cancelExcludes() {
+    this.showExcludes = false;
+    this.excludedAppIds = {};
+    this.exclusionCount = 0;
+  }
+
+  private saveExcludes() {
+    let exceptionKeys: string[] = [];
+    for(const steamDirectory in this.previewData) {
+      if(this.excludedAppIds[steamDirectory]) {
+        for(const userId in this.previewData[steamDirectory]) {
+          if(this.excludedAppIds[steamDirectory][userId]) {
+            let newKeys = Object.keys(this.excludedAppIds[steamDirectory][userId]).filter((appId: string)=> {
+              return !!this.excludedAppIds[steamDirectory][userId][appId]
+            }).map((appId: string) =>{
+              const app = this.previewData[steamDirectory][userId].apps[appId];
+              const exceptionId = steam.generateShortAppId(app.executableLocation, app.extractedTitle)
+              return `${app.extractedTitle} \$\{id:${exceptionId}\}`
+            });
+            exceptionKeys = exceptionKeys.concat(newKeys)
+
+            this.previewData[steamDirectory][userId].apps = _.pickBy(this.previewData[steamDirectory][userId].apps, (value: PreviewDataApp, key: string) => {
+              return !this.excludedAppIds[steamDirectory][userId][key]
+            })
+          }
+        }
+      }
+    }
+    for(const exceptionKey of exceptionKeys) {
+      this.userExceptionsService.addException(exceptionKey, {
+        newTitle: '',
+        searchTitle: '',
+        commandLineArguments: '',
+        exclude: true,
+        excludeArtwork: false
+      })
+    }
+    this.cancelExcludes();
+  }
+
+  private refreshImages(app: PreviewDataApp, imageType?: string) {
+    if(this.previewService.getImageType()=='games') {
+      this.previewService.downloadImageUrls(imageType,[app.images[imageType].imagePool], app.imageProviders);
+    } else {
+      for(const artworkType of artworkTypes) {
+        this.previewService.downloadImageUrls(artworkType,[app.images[artworkType].imagePool], app.imageProviders);
+      }
+    }
+  }
+
   private saveImage(image: ImageContent, title: string) {
     FileSaver.saveAs(image.imageUrl, title.replace(/[/\\?%*:|"<>]/g, '-'))
   }
 
-  private previousImage(app: PreviewDataApp, imagetype?: string) {
-    if(this.previewService.getImageType()!='games'){
-      imagetype = this.previewService.getImageType();
+  private previousImage(app: PreviewDataApp, imageType?: string) {
+    if(this.previewService.getImageType() !== 'games'){
+      imageType = this.previewService.getImageType();
     }
-    if (imagetype === 'long') {
-      this.previewService.setImageIndex(app, app.images.imageIndex - 1, imagetype);
-    } else if (imagetype === 'tall') {
-      this.previewService.setImageIndex(app, app.tallimages.imageIndex - 1, imagetype);
-    } else if (imagetype === 'hero') {
-      this.previewService.setImageIndex(app, app.heroimages.imageIndex - 1, imagetype);
-    } else if (imagetype === 'logo') {
-      this.previewService.setImageIndex(app, app.logoimages.imageIndex - 1, imagetype);
-    } else if (imagetype === 'icon') {
-      this.previewService.setImageIndex(app, app.icons.imageIndex - 1, imagetype);
-    }
-
+    this.previewService.setImageIndex(app, app.images[imageType].imageIndex - 1, imageType);
   }
 
-  private nextImage(app: PreviewDataApp, imagetype?: string) {
+  private nextImage(app: PreviewDataApp, imageType?: string) {
     if(this.previewService.getImageType()!='games'){
-      imagetype = this.previewService.getImageType();
+      imageType = this.previewService.getImageType();
     }
-    if (imagetype === 'long') {
-      this.previewService.setImageIndex(app, app.images.imageIndex + 1, imagetype);
-    } else if (imagetype === 'tall') {
-      this.previewService.setImageIndex(app, app.tallimages.imageIndex + 1, imagetype);
-    } else if (imagetype === 'hero') {
-      this.previewService.setImageIndex(app, app.heroimages.imageIndex + 1, imagetype);
-    } else if (imagetype === 'logo') {
-      this.previewService.setImageIndex(app, app.logoimages.imageIndex + 1, imagetype);
-    } else if (imagetype === 'icon') {
-      this.previewService.setImageIndex(app, app.icons.imageIndex + 1, imagetype);
-    }
-
+    this.previewService.setImageIndex(app, app.images[imageType].imageIndex + 1, imageType);
   }
 
   private setImageSize(value: number, save: boolean = false) {
     if (this.elementRef && this.elementRef.nativeElement) {
-      if (typeof value === 'string')
+      if (typeof value === 'string') {
         value = parseFloat(value);
-
-      if (value <= 100) {
-        if (value < 30)
-          value = 30;
       }
-      else
-        value = 100;
-
+      value = Math.min(Math.max(value, 30), 100);
       this.appSettings.previewSettings.imageZoomPercentage = value;
-
       if (save) {
         this.settingsService.saveAppSettings();
       }
-
       this.renderer.setStyle(this.elementRef.nativeElement, '--preview-image-size', value / 100, RendererStyleFlags2.DashCase);
     }
   }
@@ -362,6 +468,10 @@ export class PreviewComponent implements OnDestroy {
   private onScroll() {
     this.scrollingEntries = true;
     this.onScrollEnd();
+  }
+
+  private sortedAppIds(apps: PreviewDataApps) {
+    return Object.keys(apps).sort((a,b)=>apps[a].title.localeCompare(apps[b].title))
   }
 
   private async exportSelection() {

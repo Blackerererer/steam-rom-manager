@@ -1,16 +1,37 @@
 import { Injectable } from '@angular/core';
-import { Http } from '@angular/http';
+import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Subject } from 'rxjs';
 import { ParsersService } from './parsers.service';
 import { LoggerService } from './logger.service';
 import { SettingsService } from './settings.service';
 import { ImageProviderService } from './image-provider.service';
+import { SteamGridDbProvider } from '../../lib/image-providers/steamgriddb.worker';
 import {
-  PreviewData, ImageContent, ParsedUserConfiguration, AppImages, PreviewVariables,
-  ImagesStatusAndContent, ProviderCallbackEventMap, PreviewDataApp, AppSettings,
-  SteamTree, userAccountData, VDF_ExtraneousItemsData, ErrorData, AppSelection, AppSelectionImages, AppSelectionImage
+  PreviewData,
+  ImageContent,
+  ParsedUserConfiguration,
+  AppImages,
+  PreviewVariables,
+  ImagesStatusAndContent,
+  ProviderCallbackEventMap,
+  PreviewDataApp,
+  AppSettings,
+  SteamTree,
+  userAccountData,
+  VDF_ExtraneousItemsData,
+  VDF_AllScreenshotsOutcomes,
+  ErrorData, AppSelection,
+  AppSelectionImages,
+  AppSelectionImage,
+  UserConfiguration
 } from '../../models';
-import { VDF_Manager, VDF_Error, CategoryManager, ControllerManager, Acceptable_Error } from "../../lib";
+import {
+  VDF_Manager,
+  VDF_Error,
+  CategoryManager,
+  ControllerManager,
+  Acceptable_Error
+} from "../../lib";
 import { APP } from '../../variables';
 import { queue } from 'async';
 import * as steam from "../../lib/helpers/steam";
@@ -18,71 +39,52 @@ import * as url from "../../lib/helpers/url";
 import * as unique_ids from "../../lib/helpers/unique-ids";
 import * as appImage from "../../lib/helpers/app-image";
 import * as ids from '../../lib/helpers/steam';
+import { artworkTypes, artworkViewTypes, defaultArtworkType, artworkIdDict, invertedArtworkIdDict } from '../../lib/artwork-types';
 import * as _ from "lodash";
 import * as fs from "fs-extra";
 import * as FileSaver from 'file-saver';
 import * as path from "path";
 import { getMaxLength } from "../../lib/helpers/app-image/get-max-length";
-import { P } from '@angular/core/src/render3';
 import { OpenDialogReturnValue } from 'electron';
+import { dialog } from '@electron/remote';
+
 @Injectable()
 
 export class PreviewService {
   private appSettings: AppSettings;
   private previewData: PreviewData;
   private previewVariables: PreviewVariables;
-  private previewDataChanged: Subject<boolean>;
-  private appImages: AppImages;
-  private appTallImages: AppImages;
-  private appHeroImages: AppImages;
-  private appLogoImages: AppImages;
-  private appIcons: AppImages;
-  private allEditedSteamDirectories: string[];
-  private imageTypes: string[];
+  private previewDataChanged: Subject<void>;
+  private appImages: {[artworkType: string]: AppImages};
   private currentImageType: string;
+  private batchProgress: BehaviorSubject<{update: string, batch: number}>;
 
-  constructor(private parsersService: ParsersService, private loggerService: LoggerService, private imageProviderService: ImageProviderService, private settingsService: SettingsService, private http: Http) {
+  constructor(private parsersService: ParsersService, private loggerService: LoggerService, private imageProviderService: ImageProviderService, private settingsService: SettingsService, private http: HttpClient) {
     this.previewData = undefined;
     this.previewVariables = {
       listIsBeingSaved: false,
       listIsBeingGenerated: false,
       listIsBeingRemoved: false,
+      listHasGenerated: false,
       numberOfQueriedImages: 0,
       numberOfListItems: 0
     };
-    this.previewDataChanged = new Subject<boolean>();
+    this.previewDataChanged = new Subject<void>();
+    this.batchProgress = new BehaviorSubject({update: "", batch: -1})
     this.settingsService.onLoad((appSettings: AppSettings) => {
       this.appSettings = appSettings;
     });
     this.appImages = {};
-    this.appTallImages = {};
-    this.appHeroImages = {};
-    this.appLogoImages = {};
-    this.appIcons = {};
-    this.imageTypes = [
-      "long",
-      "tall",
-      "hero",
-      "logo",
-      "icon",
-      "games"
-    ];
-    this.currentImageType = "long";
+    for(const artworkType of artworkTypes) {
+      this.appImages[artworkType] = {};
+    }
+
+    this.currentImageType = defaultArtworkType;
     this.imageProviderService.instance.stopEvent.subscribe(() => {
-      for (let imageKey in this.appImages) {
-        this.appImages[imageKey].retrieving = false;
-      }
-      for(let imageKey in this.appTallImages) {
-        this.appTallImages[imageKey].retrieving = false;
-      }
-      for(let imageKey in this.appHeroImages) {
-        this.appHeroImages[imageKey].retrieving = false;
-      }
-      for(let imageKey in this.appLogoImages) {
-        this.appLogoImages[imageKey].retrieving = false;
-      }
-      for(let imageKey in this.appIcons) {
-        this.appIcons[imageKey].retrieving = false;
+      for(const artworkType of artworkTypes) {
+        for(const imageKey in this.appImages[artworkType]) {
+          this.appImages[artworkType][imageKey].retrieving = false;
+        }
       }
       this.previewVariables.numberOfQueriedImages = 0;
       this.loggerService.info(this.lang.info.allImagesRetrieved, { invokeAlert: true, alertTimeout: 3000 });
@@ -101,13 +103,12 @@ export class PreviewService {
   getPreviewDataChange() {
     return this.previewDataChanged;
   }
+  getBatchProgress() {
+    return this.batchProgress.asObservable();
+  }
 
   getPreviewVariables() {
     return this.previewVariables;
-  }
-
-  getImageTypes() {
-    return this.imageTypes;
   }
 
   getImageType() {
@@ -115,6 +116,10 @@ export class PreviewService {
   }
   setImageType(imageType: string) {
     this.currentImageType = imageType;
+  }
+
+  onLoadUserConfigurations(callback: (userConfigurations: UserConfiguration[]) => void) {
+    return this.parsersService.onLoad(callback);
   }
 
   generatePreviewData() {
@@ -130,19 +135,35 @@ export class PreviewService {
     this.generatePreviewDataCallback();
   }
 
-  saveData(remove: boolean): Promise<any> {
+  getMatchFixes(title: string) {
+    return SteamGridDbProvider.retrievePossibleIds(title)
+  }
+
+  updateAppImages(imagePool: string, oldPool: string, artworkType: string) {
+    this.appImages[artworkType][imagePool] = {
+      retrieving: false,
+      searchQueries: [imagePool],
+      imageProviderAPIs: this.appImages[artworkType][oldPool].imageProviderAPIs,
+      defaultImageProviders: this.appImages[artworkType][oldPool].defaultImageProviders,
+      content: this.appImages[artworkType][oldPool].content.filter((imageContent: ImageContent) => {
+        return ['LocalStorage'].includes(imageContent.imageProvider)
+      })
+    }
+  }
+
+  saveData({batchWrite, removeAll}: {batchWrite: boolean, removeAll: boolean}): Promise<any> {
 
     let knownSteamDirectories = this.parsersService.getKnownSteamDirectories();
     if (this.previewVariables.listIsBeingSaved) {
       return Promise.resolve().then(() => { this.loggerService.info(this.lang.info.listIsBeingSaved, { invokeAlert: true, alertTimeout: 3000 }); return false; });
     }
-    else if (!remove && this.previewVariables.numberOfListItems === 0) {
+    else if (!removeAll && this.previewVariables.numberOfListItems === 0) {
       return Promise.resolve().then(() => { this.loggerService.info(this.lang.info.listIsEmpty, { invokeAlert: true, alertTimeout: 3000 }); return false; });
     }
     else if (this.previewVariables.listIsBeingRemoved) {
       return Promise.resolve().then(() => { this.loggerService.info(this.lang.info.listIsBeingRemoved, { invokeAlert: true, alertTimeout: 3000 }); return false; });
     }
-    else if (remove && knownSteamDirectories.length === 0) {
+    else if (removeAll && knownSteamDirectories.length === 0) {
       return Promise.resolve().then(() => { this.loggerService.error(this.lang.errors.knownSteamDirListIsEmpty, { invokeAlert: true, alertTimeout: 3000 }); return false; });
     }
 
@@ -154,7 +175,7 @@ export class PreviewService {
     let extraneousAppIds: VDF_ExtraneousItemsData = undefined;
     let chain: Promise<any> =  Promise.resolve().then(()=>{
       this.loggerService.info(this.lang.info.populatingVDF_List, { invokeAlert: true, alertTimeout: 3000 });
-      return vdfManager.prepare(remove ? knownSteamDirectories : this.previewData)
+      return vdfManager.prepare(removeAll ? knownSteamDirectories : this.previewData)
     })
     .then(()=>{
       this.loggerService.info(this.lang.info.creatingBackups, { invokeAlert: true, alertTimeout: 3000 });
@@ -164,10 +185,10 @@ export class PreviewService {
       this.loggerService.info(this.lang.info.readingVDF_Files, { invokeAlert: true, alertTimeout: 3000 });
       return vdfManager.read();
     })
-    if(!remove) {
+    if(!removeAll) {
       chain = chain.then(() => {
         this.loggerService.info(this.lang.info.mergingVDF_entries, { invokeAlert: true, alertTimeout: 3000 });
-        return vdfManager.mergeData(this.previewData, this.appImages, this.appTallImages, this.appHeroImages, this.appLogoImages,this.appIcons, this.appSettings.previewSettings.deleteDisabledShortcuts)
+        return vdfManager.mergeData(this.previewData, this.appImages, this.appSettings.previewSettings.deleteDisabledShortcuts)
       })
     } else {
       chain = chain.then(() => {
@@ -180,7 +201,7 @@ export class PreviewService {
     })
     .then(() => {
       this.loggerService.info(this.lang.info.savingCategories)
-      return categoryManager.save(this.previewData, extraneousAppIds, remove)
+      return categoryManager.save(this.previewData, extraneousAppIds, removeAll)
     }).catch((error: Acceptable_Error | Error) => {
       if(error instanceof Acceptable_Error) {
         this.loggerService.error(this.lang.errors.categorySaveError, { invokeAlert: true, alertTimeout: 3000 });
@@ -190,8 +211,8 @@ export class PreviewService {
       }
     })
     .then(() => {
-      this.loggerService.info('Saving controllers')
-      return controllerManager.save(this.previewData, extraneousAppIds, remove)
+      this.loggerService.info(this.lang.info.savingControllers)
+      return controllerManager.save(this.previewData, extraneousAppIds, removeAll)
     }).catch((error: Acceptable_Error | Error) => {
       if(error instanceof Acceptable_Error) {
         this.loggerService.error(this.lang.errors.controllerSaveError, { invokeAlert: true, alertTimeout: 3000 });
@@ -201,12 +222,33 @@ export class PreviewService {
       }
     })
     .then(() => {
-      this.loggerService.info('Writing VDFs')
-      return vdfManager.write();
+      if (removeAll) {
+        this.loggerService.info(this.lang.info.removingVDF_entries)
+      } else {
+        this.loggerService.info(this.lang.info.writingVDF_entries__i.interpolate({ batchSize: 500 }), { invokeAlert: true, alertTimeout: 3000 })
+      }
+      if (batchWrite) {
+        vdfManager.getBatchProgress().subscribe(({update, batch}: {update: string, batch: number})=> {
+          console.log("batch", batch, update)
+          if(batch > -1) {
+            this.loggerService.info(update, {invokeAlert: true, alertTimeout: 3000})
+            this.batchProgress.next({update: update, batch: batch})
+          }
+        })
+      }
+      return vdfManager.write(batchWrite);
+    })
+    .then(({nonFatal, outcomes}: {nonFatal: VDF_Error, outcomes: VDF_AllScreenshotsOutcomes})=> {
+      if(nonFatal) {
+        this.loggerService.error(nonFatal)
+      }
+      if(batchWrite) {
+        this.updatePreviewDataUrls(outcomes)
+      }
     })
     .then(() => {
       this.previewVariables.listIsBeingSaved = false;
-      if (remove) {
+      if (removeAll) {
         this.loggerService.success(this.lang.success.removingVDF_entries, { invokeAlert: true, alertTimeout: 3000 });
         this.clearPreviewData();
       } else {
@@ -222,20 +264,33 @@ export class PreviewService {
     return chain;
   }
 
-  loadImage(app: PreviewDataApp, imagetype?: string) {
+  private updatePreviewDataUrls(outcomes: VDF_AllScreenshotsOutcomes) {
+    for(const steamDirectory in outcomes) {
+      for(const userId in outcomes[steamDirectory]) {
+        for(const gridName in outcomes[steamDirectory][userId].successes) {
+          const shortId = gridName.match(/^\d+/).toString();
+          const longId = steam.lengthenAppId(shortId);
+          const imageType = invertedArtworkIdDict[gridName.replace(/^\d+/,'')];
+          const steamImageUrl = url.encodeFile(outcomes[steamDirectory][userId].successes[gridName]);
+          if(this.previewData[steamDirectory][userId].apps[longId]) {
+            this.previewData[steamDirectory][userId].apps[longId].images[imageType].steam = {
+              imageProvider: 'Steam',
+              imageUrl: steamImageUrl,
+              imageRes: url.imageDimensions(steamImageUrl),
+              loadStatus: 'done'
+            }
+          }
+        }
+      }
+    }
+    this.previewDataChanged.next()
+  }
+
+  loadImage(app: PreviewDataApp, imageType?: string) {
     if (app) {
       let image: ImageContent;
-      if (this.currentImageType === 'long' || (this.currentImageType==='games' && imagetype==='long')) {
-        image = appImage.getCurrentImage(app.images, this.appImages);
-      } else if (this.currentImageType === 'tall' || (this.currentImageType==='games' && imagetype==='tall') ) {
-        image = appImage.getCurrentImage(app.tallimages, this.appTallImages);
-      } else if (this.currentImageType === 'hero' || (this.currentImageType==='games' && imagetype==='hero') ) {
-        image = appImage.getCurrentImage(app.heroimages, this.appHeroImages);
-      } else if (this.currentImageType === 'logo' || (this.currentImageType==='games' && imagetype==='logo') ) {
-        image = appImage.getCurrentImage(app.logoimages, this.appLogoImages);
-      } else if (this.currentImageType === 'icon' || (this.currentImageType==='games' && imagetype==='icon') ) {
-        image = appImage.getCurrentImage(app.icons, this.appIcons);
-      }
+      const actualImageType = this.currentImageType === 'games' ? imageType : this.currentImageType;
+      image = appImage.getCurrentImage(app.images[actualImageType], this.appImages[actualImageType]);
 
       if (image !== undefined && (image.loadStatus === 'notStarted' || image.loadStatus === 'failed')) {
         if (image.loadStatus === 'failed') {
@@ -290,105 +345,48 @@ export class PreviewService {
   }
 
   preloadImages() {
-    for (let imageKey in this.appImages) {
-      for (let i = 0; i < this.appImages[imageKey].content.length; i++) {
-        this.preloadImage(this.appImages[imageKey].content[i]);
-      }
-    }
-    for (let imageKey in this.appTallImages) {
-      for (let i = 0; i < this.appTallImages[imageKey].content.length; i++) {
-        this.preloadImage(this.appTallImages[imageKey].content[i]);
-      }
-    }
-    for (let imageKey in this.appHeroImages) {
-      for (let i = 0; i < this.appHeroImages[imageKey].content.length; i++) {
-        this.preloadImage(this.appHeroImages[imageKey].content[i]);
-      }
-    }
-    for (let imageKey in this.appLogoImages) {
-      for (let i = 0; i < this.appLogoImages[imageKey].content.length; i++) {
-        this.preloadImage(this.appLogoImages[imageKey].content[i]);
-      }
-    }
-    for (let imageKey in this.appIcons) {
-      for (let i = 0; i < this.appIcons[imageKey].content.length; i++) {
-        this.preloadImage(this.appIcons[imageKey].content[i]);
+    for(const artworkType of artworkTypes) {
+      for(const imageKey in this.appImages[artworkType]) {
+        for (let i = 0; i < this.appImages[artworkType][imageKey].content.length; i++) {
+          this.preloadImage(this.appImages[artworkType][imageKey].content[i]);
+        }
       }
     }
   }
 
-  setImageIndex(app: PreviewDataApp, index: number, imagetype?: string, ignoreCurrentType: boolean = false) {
+  setImageIndex(app: PreviewDataApp, index: number, imageType?: string, ignoreCurrentType: boolean = false) {
     if (app) {
       if (!ignoreCurrentType && this.currentImageType!="games"){
-        imagetype = this.currentImageType;
+        imageType = this.currentImageType;
       }
-      if (imagetype === 'long') {
-        appImage.setImageIndex(app.images, this.appImages, index);
-      } else if (imagetype === 'tall') {
-        appImage.setImageIndex(app.tallimages, this.appTallImages, index);
-      } else if (imagetype === 'hero') {
-        appImage.setImageIndex(app.heroimages, this.appHeroImages, index);
-      } else if (imagetype === 'logo') {
-        appImage.setImageIndex(app.logoimages, this.appLogoImages, index);
-      } else if (imagetype === 'icon') {
-        appImage.setImageIndex(app.icons, this.appIcons, index);
-      }
-
+      appImage.setImageIndex(app.images[imageType],this.appImages[imageType], index)
       this.previewDataChanged.next();
     }
   }
 
-  areImagesAvailable(app: PreviewDataApp, imagetype?: string) {
-    return this.getTotalLengthOfImages(app, imagetype) > 0;
+  areImagesAvailable(app: PreviewDataApp, imageType?: string) {
+    return this.getTotalLengthOfImages(app, imageType) > 0;
   }
 
-  getTotalLengthOfImages(app: PreviewDataApp, imagetype?: string, ignoreCurrentType: boolean = false) {
+  getTotalLengthOfImages(app: PreviewDataApp, imageType?: string, ignoreCurrentType: boolean = false) {
     if (app) {
       if (!ignoreCurrentType && this.currentImageType!="games") {
-        imagetype = this.currentImageType;
+        imageType = this.currentImageType;
       }
-      if (imagetype === 'long') {
-        return appImage.getMaxLength(app.images, this.appImages);
-      } else if (imagetype === 'tall') {
-        return appImage.getMaxLength(app.tallimages, this.appTallImages);
-      } else if (imagetype === 'hero') {
-        return appImage.getMaxLength(app.heroimages, this.appHeroImages);
-      } else if (imagetype === 'logo') {
-        return appImage.getMaxLength(app.logoimages, this.appLogoImages);
-      } else if (imagetype === 'icon') {
-        return appImage.getMaxLength(app.icons, this.appIcons);
-      }
+      return appImage.getMaxLength(app.images[imageType], this.appImages[imageType])
     }
     else
       return 0;
   }
 
-  getCurrentImage(app: PreviewDataApp, imagetype?: string) {
-    if (this.currentImageType === 'long' || (this.currentImageType=='games' && imagetype=='long')) {
-      return appImage.getCurrentImage(app.images, this.appImages);
-    } else if (this.currentImageType === 'tall' || (this.currentImageType=='games' && imagetype=='tall')) {
-      return appImage.getCurrentImage(app.tallimages, this.appTallImages);
-    } else if (this.currentImageType === 'hero' || (this.currentImageType=='games' && imagetype=='hero')) {
-      return appImage.getCurrentImage(app.heroimages, this.appHeroImages);
-    } else if (this.currentImageType === 'logo'|| (this.currentImageType=='games' && imagetype=='logo')) {
-      return appImage.getCurrentImage(app.logoimages, this.appLogoImages);
-    } else if (this.currentImageType === 'icon'|| (this.currentImageType=='games' && imagetype=='icon')) {
-      return appImage.getCurrentImage(app.icons, this.appIcons);
-    }
+  getCurrentImage(app: PreviewDataApp, imageType?: string) {
+    const actualImageType = this.currentImageType === 'games' ? imageType : this.currentImageType;
+    return appImage.getCurrentImage(app.images[actualImageType], this.appImages[actualImageType])
   }
 
-  getImages(imagetype?: string ) {
-    if (this.currentImageType === 'long' || (this.currentImageType=='games' && imagetype=='long')) {
-      return this.appImages
-    } else if (this.currentImageType === 'tall' || (this.currentImageType=='games' && imagetype=='tall')) {
-      return this.appTallImages;
-    } else if (this.currentImageType === 'hero' || (this.currentImageType=='games' && imagetype=='hero')) {
-      return this.appHeroImages;
-    } else if (this.currentImageType === 'logo'|| (this.currentImageType=='games' && imagetype=='logo')) {
-      return this.appLogoImages;
-    } else if (this.currentImageType === 'icon'|| (this.currentImageType=='games' && imagetype=='icon')) {
-      return this.appIcons;
-    }
+  getImages(imageType?: string) {
+    const actualImageType = this.currentImageType === 'games' ? imageType : this.currentImageType;
+    return this.appImages[actualImageType]
   }
 
   clearPreviewData() {
@@ -412,40 +410,15 @@ export class PreviewService {
 
   // If settingsOnly is true then api filters are not applied
   private clearImageCache(settingsOnly: boolean) {
-    for (let imageKey in this.appImages) {
-      this.appImages[imageKey].defaultImageProviders = [];
-      this.appImages[imageKey].searchQueries = [];
-      this.appImages[imageKey].retrieving = false;
-      if (!settingsOnly)
-        this.appImages[imageKey].content = [];
-    }
-    for (let imageKey in this.appTallImages) {
-      this.appTallImages[imageKey].defaultImageProviders = [];
-      this.appTallImages[imageKey].searchQueries = [];
-      this.appTallImages[imageKey].retrieving = false;
-      if (!settingsOnly)
-        this.appTallImages[imageKey].content = [];
-    }
-    for (let imageKey in this.appHeroImages) {
-      this.appHeroImages[imageKey].defaultImageProviders = [];
-      this.appHeroImages[imageKey].searchQueries = [];
-      this.appHeroImages[imageKey].retrieving = false;
-      if (!settingsOnly)
-        this.appHeroImages[imageKey].content = [];
-    }
-    for (let imageKey in this.appLogoImages) {
-      this.appLogoImages[imageKey].defaultImageProviders = [];
-      this.appLogoImages[imageKey].searchQueries = [];
-      this.appLogoImages[imageKey].retrieving = false;
-      if (!settingsOnly)
-        this.appLogoImages[imageKey].content = [];
-    }
-    for (let imageKey in this.appIcons) {
-      this.appIcons[imageKey].defaultImageProviders = [];
-      this.appIcons[imageKey].searchQueries = [];
-      this.appIcons[imageKey].retrieving = false;
-      if (!settingsOnly)
-        this.appIcons[imageKey].content = [];
+    for(const artworkType of artworkTypes) {
+      for(const imageKey in this.appImages[artworkType]) {
+        this.appImages[artworkType][imageKey].defaultImageProviders = [];
+        this.appImages[artworkType][imageKey].searchQueries = [];
+        this.appImages[artworkType][imageKey].retrieving = false;
+        if (!settingsOnly) {
+          this.appImages[artworkType][imageKey].content = [];
+        }
+      }
     }
   }
 
@@ -495,26 +468,27 @@ export class PreviewService {
         if (previewData && previewData.numberOfItems > 0) {
           this.previewData = previewData.data;
           this.previewVariables.numberOfListItems = previewData.numberOfItems;
-          this.downloadImageUrls('long');
-          this.downloadImageUrls('tall');
-          this.downloadImageUrls('hero');
-          this.downloadImageUrls('logo');
-          this.downloadImageUrls('icon');
+          for(const artworkType of artworkTypes) {
+            this.downloadImageUrls(artworkType)
+          }
         }
         else {
           this.previewVariables.numberOfListItems = 0;
         }
 
         this.previewVariables.listIsBeingGenerated = false;
+        this.previewVariables.listHasGenerated = true;
         this.previewDataChanged.next();
       }).catch((error) => {
         this.loggerService.error(this.lang.errors.fatalError, { invokeAlert: true, alertTimeout: 3000 });
         this.loggerService.error(error);
         this.previewVariables.listIsBeingGenerated = false;
+        this.previewVariables.listHasGenerated = true;
         this.previewDataChanged.next();
       });
     }
   }
+
   private createPreviewData(data: ParsedUserConfiguration[], oldData?: PreviewData) {
     return Promise.resolve().then(() => {
       let steamTreeData = steam.generateTreeFromParsedConfig(data);
@@ -568,109 +542,51 @@ export class PreviewService {
 
             if (shortcutsData[config.steamDirectory][userAccount.accountID][appID] !== undefined) {
               if (shortcutsData[config.steamDirectory][userAccount.accountID][appID]['icon'] !== undefined) {
-                if (file.localIcons.indexOf(shortcutsData[config.steamDirectory][userAccount.accountID][appID]['icon']) === -1) {
-                  file.localIcons.unshift(shortcutsData[config.steamDirectory][userAccount.accountID][appID]['icon']);
+                if (file.localImages['icon'].indexOf(shortcutsData[config.steamDirectory][userAccount.accountID][appID]['icon']) === -1) {
+                  file.localImages['icon'].unshift(shortcutsData[config.steamDirectory][userAccount.accountID][appID]['icon']);
                 }
               }
             }
-
-            if (this.appImages[file.imagePool] === undefined) {
-              this.appImages[file.imagePool] = {
-                retrieving: false,
-                searchQueries: file.onlineImageQueries,
-                imageProviderAPIs: config.imageProviderAPIs,
-                defaultImageProviders: config.imageProviders,
-                content: []
-              };
+            for(const artworkType of artworkTypes) {
+              if(this.appImages[artworkType][file.imagePool] === undefined) {
+                this.appImages[artworkType][file.imagePool] = {
+                  retrieving: false,
+                  searchQueries: file.onlineImageQueries,
+                  imageProviderAPIs: config.imageProviderAPIs,
+                  defaultImageProviders: config.imageProviders,
+                  content: []
+                }
+              } else {
+                let currentQueries = this.appImages[artworkType][file.imagePool].searchQueries;
+                let currentProviders = this.appImages[artworkType][file.imagePool].defaultImageProviders;
+                this.appImages[artworkType][file.imagePool].imageProviderAPIs = config.imageProviderAPIs;
+                this.appImages[artworkType][file.imagePool].searchQueries = _.union(currentQueries, file.onlineImageQueries);
+                this.appImages[artworkType][file.imagePool].defaultImageProviders = _.union(currentProviders, config.imageProviders);
+              }
             }
-            else {
-              let currentQueries = this.appImages[file.imagePool].searchQueries;
-              let currentProviders = this.appImages[file.imagePool].defaultImageProviders;
-
-              this.appImages[file.imagePool].imageProviderAPIs = config.imageProviderAPIs;
-              this.appImages[file.imagePool].searchQueries = _.union(currentQueries, file.onlineImageQueries);
-              this.appImages[file.imagePool].defaultImageProviders = _.union(currentProviders, config.imageProviders);
-            }
-            if (this.appTallImages[file.imagePool] === undefined) {
-              this.appTallImages[file.imagePool] = {
-                retrieving: false,
-                searchQueries: file.onlineImageQueries,
-                imageProviderAPIs: config.imageProviderAPIs,
-                defaultImageProviders: config.imageProviders,
-                content: []
-              };
-            }
-            else {
-              let currentQueries = this.appTallImages[file.imagePool].searchQueries;
-              let currentProviders = this.appTallImages[file.imagePool].defaultImageProviders;
-
-              this.appTallImages[file.imagePool].imageProviderAPIs = config.imageProviderAPIs;
-              this.appTallImages[file.imagePool].searchQueries = _.union(currentQueries, file.onlineImageQueries);
-              this.appTallImages[file.imagePool].defaultImageProviders = _.union(currentProviders, config.imageProviders);
-            }
-            if (this.appHeroImages[file.imagePool] === undefined) {
-              this.appHeroImages[file.imagePool] = {
-                retrieving: false,
-                searchQueries: file.onlineImageQueries,
-                imageProviderAPIs: config.imageProviderAPIs,
-                defaultImageProviders: config.imageProviders,
-                content: []
-              };
-            }
-            else {
-              let currentQueries = this.appHeroImages[file.imagePool].searchQueries;
-              let currentProviders = this.appHeroImages[file.imagePool].defaultImageProviders;
-
-              this.appHeroImages[file.imagePool].imageProviderAPIs = config.imageProviderAPIs;
-              this.appHeroImages[file.imagePool].searchQueries = _.union(currentQueries, file.onlineImageQueries);
-              this.appHeroImages[file.imagePool].defaultImageProviders = _.union(currentProviders, config.imageProviders);
-            }
-            if (this.appLogoImages[file.imagePool] === undefined) {
-              this.appLogoImages[file.imagePool] = {
-                retrieving: false,
-                searchQueries: file.onlineImageQueries,
-                imageProviderAPIs: config.imageProviderAPIs,
-                defaultImageProviders: config.imageProviders,
-                content: []
-              };
-            }
-            else {
-              let currentQueries = this.appLogoImages[file.imagePool].searchQueries;
-              let currentProviders = this.appLogoImages[file.imagePool].defaultImageProviders;
-
-              this.appLogoImages[file.imagePool].imageProviderAPIs = config.imageProviderAPIs;
-              this.appLogoImages[file.imagePool].searchQueries = _.union(currentQueries, file.onlineImageQueries);
-              this.appLogoImages[file.imagePool].defaultImageProviders = _.union(currentProviders, config.imageProviders);
-            }
-            if (this.appIcons[file.imagePool] === undefined) {
-              this.appIcons[file.imagePool] = {
-                retrieving: false,
-                searchQueries: file.onlineImageQueries,
-                imageProviderAPIs: config.imageProviderAPIs,
-                defaultImageProviders: config.imageProviders,
-                content: []
-              };
-            }
-            else {
-              let currentQueries = this.appIcons[file.imagePool].searchQueries;
-              let currentProviders = this.appIcons[file.imagePool].defaultImageProviders;
-              this.appIcons[file.imagePool].imageProviderAPIs = config.imageProviderAPIs;
-              this.appIcons[file.imagePool].searchQueries = _.union(currentQueries, file.onlineImageQueries);
-              this.appIcons[file.imagePool].defaultImageProviders = _.union(currentProviders, config.imageProviders);
-            }
-
 
             if (previewData[config.steamDirectory][userAccount.accountID].apps[appID] === undefined) {
-              let steamImage = gridData[config.steamDirectory][userAccount.accountID][appID];
-              let steamTallImage = gridData[config.steamDirectory][userAccount.accountID][ids.shortenAppId(appID).concat('p')];
-              let steamHeroImage = gridData[config.steamDirectory][userAccount.accountID][ids.shortenAppId(appID).concat('_hero')];
-              let steamLogoImage = gridData[config.steamDirectory][userAccount.accountID][ids.shortenAppId(appID).concat('_logo')];
-              let steamIcon = gridData[config.steamDirectory][userAccount.accountID][ids.shortenAppId(appID).concat('_icon')];
-              let steamImageUrl = steamImage ? url.encodeFile(steamImage) : undefined;
-              let steamTallImageUrl = steamTallImage ? url.encodeFile(steamTallImage) : undefined;
-              let steamHeroImageUrl = steamHeroImage ? url.encodeFile(steamHeroImage) : undefined;
-              let steamLogoImageUrl = steamLogoImage ? url.encodeFile(steamLogoImage) : undefined;
-              let steamIconUrl = steamIcon ? url.encodeFile(steamIcon) : undefined;
+              let images: {[artworkType: string]: any} = {};
+              for(const artworkType of artworkTypes) {
+                const steamImage = gridData[config.steamDirectory][userAccount.accountID][ids.shortenAppId(appID).concat(artworkIdDict[artworkType])];
+                const steamImageUrl = steamImage ? url.encodeFile(steamImage) : undefined;
+                images[artworkType] = {
+                  steam: steamImage ? {
+                    imageProvider: 'Steam',
+                    imageUrl: steamImageUrl,
+                    imageRes: url.imageDimensions(steamImageUrl),
+                    loadStatus: 'done'
+                  } : undefined,
+                  default: file.defaultImage[artworkType] ? {
+                    imageProvider: 'LocalStorage',
+                    imageUrl: file.defaultImage[artworkType],
+                    imageRes: url.imageDimensions(file.defaultImage[artworkType]),
+                    loadStatus: 'done'
+                  } : undefined,
+                  imagePool: file.imagePool,
+                  imageIndex: 0
+                }
+              }
 
               previewData[config.steamDirectory][userAccount.accountID].apps[appID] = {
                 entryId: numberOfItems++,
@@ -685,89 +601,7 @@ export class PreviewService {
                 title: file.finalTitle,
                 extractedTitle: file.extractedTitle,
                 controllers: config.controllers,
-                images: {
-                  steam: steamImage ? {
-                    imageProvider: 'Steam',
-                    imageUrl: steamImageUrl,
-                    imageRes: url.imageDimensions(steamImageUrl),
-                    loadStatus: 'done'
-                  } : undefined,
-                  default: file.defaultImage ? {
-                    imageProvider: 'LocalStorage',
-                    imageUrl: file.defaultImage,
-                    imageRes: url.imageDimensions(file.defaultImage),
-                    loadStatus: 'done'
-                  } : undefined,
-                  imagePool: file.imagePool,
-                  imageIndex: 0
-                },
-                tallimages: {
-                  steam: steamTallImage ? {
-                    imageProvider: 'Steam',
-                    imageUrl: steamTallImageUrl,
-                    imageRes: url.imageDimensions(steamTallImageUrl),
-                    loadStatus: 'done'
-                  } : undefined,
-                  default: file.defaultTallImage ? {
-                    imageProvider: 'LocalStorage',
-                    imageUrl: file.defaultTallImage,
-                    imageRes: url.imageDimensions(file.defaultTallImage),
-                    loadStatus: 'done'
-                  } : undefined,
-                  imagePool: file.imagePool,
-                  imageIndex: 0
-                },
-                heroimages: {
-                  steam: steamHeroImage ? {
-                    imageProvider: 'Steam',
-                    imageUrl: steamHeroImageUrl,
-                    imageRes: url.imageDimensions(steamHeroImageUrl),
-
-                    loadStatus: 'done'
-                  } : undefined,
-                  default: file.defaultHeroImage ? {
-                    imageProvider: 'LocalStorage',
-                    imageUrl: file.defaultHeroImage,
-                    imageRes: url.imageDimensions(file.defaultHeroImage),
-                    loadStatus: 'done'
-                  } : undefined,
-                  imagePool: file.imagePool,
-                  imageIndex: 0
-                },
-                logoimages: {
-                  steam: steamLogoImage ? {
-                    imageProvider: 'Steam',
-                    imageUrl: steamLogoImageUrl,
-                    imageRes: url.imageDimensions(steamLogoImageUrl),
-
-                    loadStatus: 'done'
-                  } : undefined,
-                  default: file.defaultLogoImage ? {
-                    imageProvider: 'LocalStorage',
-                    imageUrl: file.defaultLogoImage,
-                    imageRes: url.imageDimensions(file.defaultLogoImage),
-                    loadStatus: 'done'
-                  } : undefined,
-                  imagePool: file.imagePool,
-                  imageIndex: 0
-                },
-                icons: {
-                  steam: steamIcon ? {
-                    imageProvider: 'Steam',
-                    imageUrl: steamIconUrl,
-                    imageRes: url.imageDimensions(steamIconUrl),
-
-                    loadStatus: 'done'
-                  } : undefined,
-                  default: file.defaultIcon ? {
-                    imageProvider: 'LocalStorage',
-                    imageUrl: file.defaultIcon,
-                    imageRes: url.imageDimensions(file.defaultIcon),
-                    loadStatus: 'done'
-                  } : undefined,
-                  imagePool: file.imagePool,
-                  imageIndex: 0
-                },
+                images: images,
                 executableLocation
               };
             }
@@ -775,51 +609,15 @@ export class PreviewService {
               let currentCategories = previewData[config.steamDirectory][userAccount.accountID].apps[appID].steamCategories;
               previewData[config.steamDirectory][userAccount.accountID].apps[appID].steamCategories = _.union(currentCategories, file.steamCategories);
             }
-
-            for (let l = 0; l < file.localImages.length; l++) {
-
-              this.addUniqueImage(file.imagePool, {
-                imageProvider: 'LocalStorage',
-                imageUrl: file.localImages[l],
-                imageRes: url.imageDimensions(file.localImages[l]),
-                loadStatus: 'done'
-              },'long')
-
-            }
-            for (let l = 0; l < file.localTallImages.length; l++) {
-              this.addUniqueImage(file.imagePool, {
-                imageProvider: 'LocalStorage',
-                imageUrl: file.localTallImages[l],
-                imageRes: url.imageDimensions(file.localTallImages[l]),
-                loadStatus: 'done'
-              },'tall')
-            }
-            for (let l = 0; l < file.localHeroImages.length; l++) {
-
-              this.addUniqueImage(file.imagePool, {
-                imageProvider: 'LocalStorage',
-                imageUrl: file.localHeroImages[l],
-                imageRes: url.imageDimensions(file.localHeroImages[l]),
-                loadStatus: 'done'
-              },'hero')
-            }
-            for (let l = 0; l < file.localLogoImages.length; l++) {
-
-              this.addUniqueImage(file.imagePool, {
-                imageProvider: 'LocalStorage',
-                imageUrl: file.localLogoImages[l],
-                imageRes: url.imageDimensions(file.localLogoImages[l]),
-                loadStatus: 'done'
-              },'logo')
-            }
-            for (let l = 0; l < file.localIcons.length; l++) {
-
-              this.addUniqueImage(file.imagePool, {
-                imageProvider: 'LocalStorage',
-                imageUrl: file.localIcons[l],
-                imageRes: url.imageDimensions(file.localIcons[l]),
-                loadStatus: 'done'
-              },'icon')
+            for(const artworkType of artworkTypes) {
+              for (let l = 0; l < file.localImages[artworkType].length; l++) {
+                this.addUniqueImage(file.imagePool, {
+                  imageProvider: 'LocalStorage',
+                  imageUrl: file.localImages[artworkType][l],
+                  imageRes: url.imageDimensions(file.localImages[artworkType][l]),
+                  loadStatus: 'done'
+                }, artworkType)
+              }
             }
           }
         }
@@ -834,33 +632,11 @@ export class PreviewService {
       let imageQueue = queue((task, callback) => callback());
 
       if (imageKeys === undefined || imageKeys.length === 0) {
-        if(imageType=="long") {
-          imageKeys = Object.keys(this.appImages);
-        } else if (imageType=="tall"){
-          imageKeys = Object.keys(this.appTallImages);
-        } else if (imageType=="hero"){
-          imageKeys = Object.keys(this.appHeroImages);
-        } else if (imageType=="logo"){
-          imageKeys = Object.keys(this.appLogoImages);
-        } else if (imageType=="icon"){
-          imageKeys = Object.keys(this.appIcons);
-        }
-
+        imageKeys = Object.keys(this.appImages[imageType]);
       }
 
       for (let i = 0; i < imageKeys.length; i++) {
-        let image: ImagesStatusAndContent;
-        if(imageType=="long") {
-          image = this.appImages[imageKeys[i]];
-        } else if (imageType=="tall") {
-          image = this.appTallImages[imageKeys[i]];
-        } else if (imageType=="hero") {
-          image = this.appHeroImages[imageKeys[i]];
-        } else if (imageType=="logo") {
-          image = this.appLogoImages[imageKeys[i]];
-        } else if (imageType=="icon") {
-          image = this.appIcons[imageKeys[i]];
-        }
+        let image: ImagesStatusAndContent = this.appImages[imageType][imageKeys[i]];
         let imageProvidersForKey: string[] = imageProviders === undefined || imageProviders.length === 0 ? image.defaultImageProviders : imageProviders;
 
         imageProvidersForKey = _.intersection(this.appSettings.enabledProviders, imageProvidersForKey);
@@ -941,39 +717,13 @@ export class PreviewService {
   }
 
   isImageUnique(imageKey: string, imageUrl: string, imageType: string) {
-    if (imageType === 'long') {
-      return this.appImages[imageKey].content.findIndex((item) => item.imageUrl === imageUrl) === -1;
-    } else if (imageType === 'tall') {
-      return this.appTallImages[imageKey].content.findIndex((item) => item.imageUrl ===imageUrl) === -1;
-    } else if (imageType === 'hero') {
-      return this.appHeroImages[imageKey].content.findIndex((item) => item.imageUrl ===imageUrl) === -1;
-    } else if (imageType === 'logo') {
-      return this.appLogoImages[imageKey].content.findIndex((item) => item.imageUrl ===imageUrl) === -1;
-    } else if (imageType === 'icon') {
-      return this.appIcons[imageKey].content.findIndex((item) => item.imageUrl ===imageUrl) === -1;
-    }
+    return this.appImages[imageType][imageKey].content.findIndex((item) => item.imageUrl === imageUrl) === -1;
   }
 
   addUniqueImage(imageKey: string, content: ImageContent, imageType: string) {
     if (this.isImageUnique(imageKey, content.imageUrl, imageType)) {
-      if (imageType === 'long') {
-        this.appImages[imageKey].content.push(content);
-        return this.appImages[imageKey].content[this.appImages[imageKey].content.length - 1];
-      } else if (imageType === 'tall') {
-        this.appTallImages[imageKey].content.push(content);
-        return this.appTallImages[imageKey].content[this.appTallImages[imageKey].content.length - 1];
-      } else if (imageType === 'hero') {
-        this.appHeroImages[imageKey].content.push(content);
-        return this.appHeroImages[imageKey].content[this.appHeroImages[imageKey].content.length - 1];
-      } else if (imageType === 'logo') {
-        this.appLogoImages[imageKey].content.push(content);
-        return this.appLogoImages[imageKey].content[this.appLogoImages[imageKey].content.length - 1];
-      } else if (imageType === 'icon') {
-        this.appIcons[imageKey].content.push(content);
-        return this.appIcons[imageKey].content[this.appIcons[imageKey].content.length - 1];
-      }
-
-
+      this.appImages[imageType][imageKey].content.push(content);
+      return this.appImages[imageType][imageKey].content[this.appImages[imageType][imageKey].content.length - 1];
     }
     return null;
   }
@@ -1006,7 +756,6 @@ export class PreviewService {
       return `${append}.${extension}`;
     }
 
-    const dialog = require('electron').remote.dialog;
     const options: Electron.OpenDialogSyncOptions = {
       properties: ['openDirectory', 'createDirectory'],
       title: 'Choose selections folder save location.'
@@ -1029,9 +778,7 @@ export class PreviewService {
 
         for (const directory in this.previewData) {
           for (const userId in this.previewData[directory]) {
-            for (const appId in this.previewData[directory][userId].apps) {
-              appsCount++;
-            }
+            appsCount += Object.keys(this.previewData[directory][userId].apps).length;
           }
         };
 
@@ -1044,30 +791,15 @@ export class PreviewService {
           for (const userId in this.previewData[directory]) {
             for (const appId in this.previewData[directory][userId].apps) {
               const app: PreviewDataApp = this.previewData[directory][userId].apps[appId];
-              const selection: AppSelection = {
+              let selection: AppSelection = {
                 title: app.extractedTitle,
-                images: {
-                  grid: appImage.getCurrentImage(app.images, this.appImages) ? {
-                    pool: app.images.imagePool,
-                    filename: await saveImage(appImage.getCurrentImage(app.images, this.appImages).imageUrl, packagePath, `${app.extractedTitle}.grid`)
-                  }: null,
-                  poster: appImage.getCurrentImage(app.tallimages, this.appTallImages) ? {
-                    pool: app.tallimages.imagePool,
-                    filename: await saveImage(appImage.getCurrentImage(app.tallimages, this.appTallImages).imageUrl, packagePath, `${app.extractedTitle}.poster`)
-                  }: null,
-                  hero: appImage.getCurrentImage(app.heroimages, this.appHeroImages) ? {
-                    pool: app.heroimages.imagePool,
-                    filename: await saveImage(appImage.getCurrentImage(app.heroimages, this.appHeroImages).imageUrl, packagePath, `${app.extractedTitle}.hero`)
-                  } : null,
-                  logo: appImage.getCurrentImage(app.logoimages, this.appLogoImages) ? {
-                    pool: app.logoimages.imagePool,
-                    filename: await saveImage(appImage.getCurrentImage(app.logoimages, this.appLogoImages).imageUrl, packagePath, `${app.extractedTitle}.logo`)
-                  } : null,
-                  icon: appImage.getCurrentImage(app.icons,this.appIcons) ? {
-                    pool: app.icons.imagePool,
-                    filename: await saveImage(appImage.getCurrentImage(app.icons, this.appIcons).imageUrl, packagePath, `${app.extractedTitle}.icon`)
-                  } : null
-                }
+                images: {}
+              }
+              for(const artworkType of artworkTypes) {
+                selection.images[artworkType] = appImage.getCurrentImage(app.images[artworkType], this.appImages[artworkType]) ? {
+                  pool: app.images[artworkType].imagePool,
+                  filename: await saveImage(appImage.getCurrentImage(app.images[artworkType], this.appImages[artworkType]).imageUrl, packagePath,`${app.extractedTitle}.${artworkType}`)
+                }: null;
               }
               apps.push(selection);
             }
@@ -1097,7 +829,6 @@ export class PreviewService {
 
   async importSelection() {
 
-    const dialog = require('electron').remote.dialog;
     const options: Electron.OpenDialogSyncOptions = {
       properties: ['openDirectory', 'createDirectory'],
       title: 'Choose selections folder location.'
@@ -1115,47 +846,15 @@ export class PreviewService {
         let importedApps: string[] = [];
 
         for (const selection of selections) {
-          if(selection.images.grid) {
-            this.addUniqueImage(selection.images.grid.pool, {
-              imageProvider: 'LocalStorage',
-              imageUrl: url.encodeFile(`${packagePath}${path.sep}${selection.images.grid.filename}`),
-              loadStatus: 'done'
-            }, 'long');
-
+          for(const artworkType of artworkTypes) {
+            if(selection.images.grid) {
+              this.addUniqueImage(selection.images[artworkType].pool, {
+                imageProvider: 'LocalStorage',
+                imageUrl: url.encodeFile(`${packagePath}${path.sep}${selection.images[artworkType].filename}`),
+                loadStatus: 'done'
+              }, artworkType);
+            }
           }
-          if(selection.images.poster) {
-            this.addUniqueImage(selection.images.poster.pool, {
-              imageProvider: 'LocalStorage',
-              imageUrl: url.encodeFile(`${packagePath}${path.sep}${selection.images.poster.filename}`),
-              loadStatus: 'done'
-            }, 'tall');
-
-          }
-          if(selection.images.hero) {
-            this.addUniqueImage(selection.images.hero.pool, {
-              imageProvider: 'LocalStorage',
-              imageUrl: url.encodeFile(`${packagePath}${path.sep}${selection.images.hero.filename}`),
-              loadStatus: 'done'
-            }, 'hero');
-
-          }
-          if(selection.images.logo) {
-            this.addUniqueImage(selection.images.logo.pool, {
-              imageProvider: 'LocalStorage',
-              imageUrl: url.encodeFile(`${packagePath}${path.sep}${selection.images.logo.filename}`),
-              loadStatus: 'done'
-            }, 'logo');
-
-          }
-          if(selection.images.icon) {
-            this.addUniqueImage(selection.images.icon.pool, {
-              imageProvider: 'LocalStorage',
-              imageUrl: url.encodeFile(`${packagePath}${path.sep}${selection.images.icon.filename}`),
-              loadStatus: 'done'
-            }, 'icon');
-
-          }
-
           importedApps.push(selection.title);
         }
 
@@ -1164,11 +863,9 @@ export class PreviewService {
             for (const appId in this.previewData[directory][userId].apps) {
               const app: PreviewDataApp = this.previewData[directory][userId].apps[appId];
               if (importedApps.includes(app.extractedTitle)) {
-                this.setImageIndex(app, this.getTotalLengthOfImages(app, 'long', true) - 1, 'long', true);
-                this.setImageIndex(app, this.getTotalLengthOfImages(app, 'tall', true) - 1, 'tall', true);
-                this.setImageIndex(app, this.getTotalLengthOfImages(app, 'hero', true) - 1, 'hero', true);
-                this.setImageIndex(app, this.getTotalLengthOfImages(app, 'logo', true) - 1, 'logo', true);
-                this.setImageIndex(app, this.getTotalLengthOfImages(app, 'icon', true) - 1, 'icon', true);
+                for(const artworkType of artworkTypes) {
+                  this.setImageIndex(app, this.getTotalLengthOfImages(app,artworkType, true) -1, artworkType, true);
+                }
               }
             }
           }

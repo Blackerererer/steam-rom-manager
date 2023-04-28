@@ -1,6 +1,6 @@
 import { availableProviders, defaultProviders, providerInfo } from '../../lib/image-providers/available-providers';
 import { availableParsers, availableParserInputs } from '../../lib/parsers/available-parsers';
-
+import { ParserType } from "../../models";
 import { cloneDeep, union } from "lodash";
 
 const sharedProperties = {
@@ -28,8 +28,6 @@ const sharedProperties = {
       default: {},
       properties: {
         specifiedAccounts: { type: 'string', default: '' },
-        skipWithMissingDataDir: { type: 'boolean', default: true },
-        useCredentials: { type: 'boolean', default: true }
       }
     },
     titleFromVariable: {
@@ -43,16 +41,14 @@ const sharedProperties = {
       }
     },
     imagePool: { type: 'string', default: '${fuzzyTitle}' },
-    defaultImage: { type: 'string', default: '' },
-    defaultTallImage: { type: 'string', default: '' },
-    defaultHeroImage: { type: 'string', default: '' },
-    defaultLogoImage: { type: 'string', default: '' },
-    defaultIcon: {type: 'string', default: ''},
-    localImages: { type: 'string', default: '' },
-    localTallImages: { type: 'string', default: '' },
-    localHeroImages: { type: 'string', default: '' },
-    localLogoImages: { type: 'string', default: '' },
-    localIcons: { type: 'string', default: '' },
+    defaultImage: {
+      type: 'object',
+      default: {},
+    },
+    localImages: {
+      type: 'object',
+      default: {},
+    },
     onlineImageQueries: { type: 'string', default: '${${fuzzyTitle}}' },
     imageProviders: {
       type: 'array',
@@ -159,7 +155,7 @@ const sharedProperties = {
   }
 }
 
-let options = availableParsers.map((parserType: string)=>{
+let options: any[] = availableParsers.map((parserType: ParserType)=>{
   let temp = cloneDeep(sharedProperties);
   if(availableParserInputs[parserType].length) {
     Object.assign(temp.properties, {

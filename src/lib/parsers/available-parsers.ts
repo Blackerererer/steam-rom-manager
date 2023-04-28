@@ -1,8 +1,9 @@
 import * as json from '../helpers/json';
-
+import { ParserType, SuperType } from '../../models';
 // Two parser inputs can't have the same names!
 // Reason: Hard to fix bug involving schema
-export const availableParserInputs: {[parserType: string]: string[]} = {
+
+export const availableParserInputs: Record<ParserType, string[]> = {
   'Glob': ['glob'],
   'Glob-regex': ['glob-regex'],
   'Manual': ['manualManifests'],
@@ -11,16 +12,16 @@ export const availableParserInputs: {[parserType: string]: string[]} = {
   'Legendary': ['legendaryInstalledFile'],
   'GOG Galaxy': ['galaxyExeOverride','gogLauncherMode'],
   'itch.io': ['itchIoAppDataOverride','itchIoWindowsOnLinuxInstallDriveRedirect'],
-  'Steam': [],
+  'Steam': ['onlyGames','onlyInstalled','sourceMods'],
   'UPlay': ['uplayDir','uplayLauncherMode'],
   'UWP': ['UWPDir', 'UWPLauncherMode'],
   'EA Desktop': ['eaGamesDir','eaLauncherMode'],
   'ScummVM': ['scummvmBinary', 'scummvmIni','useFlatpak']
-}
+};
 
-export const availableParsers = Object.keys(availableParserInputs);
+export const availableParsers: ParserType[] = Object.keys(availableParserInputs) as ParserType[];
 
-export const superTypes: {[superType: string]: string[]} = {
+export const superTypes: Record<SuperType, ParserType[]> = {
   'Manual': ['Manual'],
   'ArtworkOnly': ['Steam'],
   'ROM': [
@@ -38,11 +39,11 @@ export const superTypes: {[superType: string]: string[]} = {
     'EA Desktop',
     'ScummVM'
   ]
-}
+};
 
-export const superTypesMap: {[parserType: string]: string | string[]} = json.multiInvert(superTypes);
+export const superTypesMap: Record<ParserType, SuperType> = json.multiInvert<SuperType, ParserType>(superTypes);
 
-export const ManualType = 'Manual'
-export const ROMType = 'ROM'
-export const PlatformType = 'Platform'
-export const ArtworkOnlyType = 'ArtworkOnly'
+export const ManualType: SuperType = 'Manual'
+export const ROMType: SuperType = 'ROM'
+export const PlatformType: SuperType = 'Platform'
+export const ArtworkOnlyType: SuperType = 'ArtworkOnly'

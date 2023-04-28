@@ -1,6 +1,6 @@
 # Fuzzy matching
 
-Fuzzy (natural) matching will be done against the tittle list provided by [SteamGridDB](http://www.steamgriddb.com/). It will try to fill in missing characters for titles which will increase probability for finding images.
+Fuzzy (natural) matching will be done against the tittle list provided by [SteamGridDB](http://www.steamgriddb.com/). Es wird versuchen, fehlende Zeichen für Prädikate auszufüllen, was die Wahrscheinlichkeit erhöht, Bilder zu finden.
 
 Fuzzy titles are available as title modifiers via `${fuzzyTitle}`. Currently fuzzy matching is only enabled for `ROM Parsers` and `Manual Parsers`.
 
@@ -8,7 +8,7 @@ It is possible, that `false` matching might occur for titles that are not in the
 
 ## Replace diacritic characters
 
-Replaces diacritic characters to their latin equivalent: `Ą` -> `A`, `Ę` -> `E`, `Ė` -> `E`, etc. Might improve the matching ability of fuzzy matcher.
+When enabled, fuzzy matcher will remove all characters except for `a-zA-Z0-9 ()[]` and will replace `_` with space. This should improve the matching ability of fuzzy matcher.
 
 ## Aggressive matching
 

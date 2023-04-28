@@ -18,57 +18,60 @@
       "saveImage": "Sauvegarder l'image",
       "addLocalImages": "Image personnalisée",
       "retryDownload": "Réessayer le téléchargement",
-      "generateAppList": "Générer une liste de jeu",
-      "saveAppList": "Enregistrer les applications sur Steam",
-      "removeAppList": "Supprimer les applications de Steam",
-      "remainingImages": "Nombre de téléchargements restant:",
-      "stopUrlRetrieving": "Arrêter tous les téléchargements",
-      "exportSelections": "Exporter les choix d'image",
-      "importSelections": "Importer les choix d'image"
+      "generateAppList": "Parse",
+      "saveAppList": "Save to Steam",
+      "removeAppList": "Remove from Steam",
+      "remainingImages": "Retrieving urls:",
+      "stopUrlRetrieving": "Stop",
+      "exportSelections": "Export",
+      "importSelections": "Import",
+      "backButton": "Back",
+      "logButton": "Log"
     },
     "service": {
       "info": {
-        "listIsBeingGenerated": "List is being generated. Please wait.",
-        "listIsBeingSaved": "List is being saved. Please wait.",
-        "listIsBeingRemoved": "List is being removed. Please wait.",
+        "listIsBeingGenerated": "La liste est en cours de génération. Veuillez patienter.",
+        "listIsBeingSaved": "La liste est en cours d'enregistrement. Veuillez patienter.",
+        "listIsBeingRemoved": "La liste est en cours de suppression. Veuillez patienter.",
         "listIsEmpty": "Liste vide.",
         "populatingVDF_List": "Populating VDF list.",
         "creatingBackups": "Creating backups.",
-        "readingVDF_Files": "Reading VDF files.",
+        "readingVDF_Files": "Lecture du fichier VDF en cours...",
         "mergingVDF_entries": "Merging VDF entries.",
         "removingVDF_entries": "Removing VDF entries and image files.",
-        "savingCategories": "Saving added category information to localconfig.vdf",
+        "savingCategories": "Saving category information to localconfig.vdf.",
+        "savingControllers": "Saving controller information.",
         "removingFromCategories": "Removing all added category information",
-        "writingVDF_entries": "Writing VDF files and saving/removing images.",
+        "writingVDF_entries__i": "Writing VDF files and downloading high res images in batches of ${batchSize}.",
         "updatingKnownSteamDirList": "Updating a list of known Steam directories.",
         "retryingDownload__i": "Retrying image download from \"${imageUrl}\" for \"${appTitle}\".",
-        "disabledConfigurations__i": "${count} user configuration(s) was/were skipped (disabled by user).",
-        "invalidConfigurations__i": "${count} user configuration(s) was/were skipped (invalid).",
+        "disabledConfigurations__i": "${count} configuration(s) utilisateur a été ignorée(s) (désactivée par l'utilisateur).",
+        "invalidConfigurations__i": "${count} configuration(s) utilisateur a été ignorée(s) (invalide).",
         "executingParsers": "Exécution des analyseurs.",
         "shutdownSteam": "Veuillez arrêter Steam s'il est en cours d'exécution.",
         "noParserConfigurations": "Veuillez d'abord créer la configuration de l'analyseur dans le menu \"Analyseurs\".",
         "parserFoundNoFiles": "Parser(s) found no files matching user configuration.",
         "allImagesRetrieved": "Toutes les URL des images disponibles ont été récupérées.",
         "providerTimeout__i": "Timeout was requested by \"${provider}\" for ${time} second(s).",
-        "noAccountsWarning": "User accounts not found. Incorrect Steam directory?",
+        "noAccountsWarning": "Comptes utilisateur introuvables. Répertoire Steam incorrect?",
         "preparingExport": "Préparation de l'exportation des choix d'image.",
         "exportProgress__i": "Sauvegarde des choix d'image ${progress}.",
         "readingSelections": "Application des choix d'image importés."
       },
       "errors": {
         "fatalError": "Une erreur fatale est survenue dans Aperçu. Consultez le journal des événements pour plus de détails.",
-        "fatalError__i": "Fatal Preview Error ${error}",
-        "knownSteamDirListIsEmpty": "A list of known Steam directories is empty.",
-        "steamIsRunning": "Cannot make changes while steam is running!",
+        "fatalError__i": "Erreur fatale d'aperçu ${error}",
+        "knownSteamDirListIsEmpty": "Une liste des répertoires Steam connus est vide.",
+        "steamIsRunning": "Impossible de faire des changements lorsque Steam est en cours d'exécution!",
         "categorySaveError": "Erreur lors de la mise à jour des catégories. Consultez le journal des événements pour plus de détails.",
-        "categorySaveError__i": "Category error (shortcuts and artwork will still be added): ${error}",
+        "categorySaveError__i": "Erreur de catégorie (les raccourcis et les images seront ajoutés): ${error}",
         "controllerSaveError": "Erreur lors de la mise à jour des modèles de contrôleur. Consultez le journal des événements pour plus de détails.",
-        "controllerSaveError__i": "Controller error (shortcuts and artwork will still be added): ${error}",
-        "retryingDownload__i": "Image download from \"${imageUrl}\" failed for \"${appTitle}\".",
-        "providerError__i": "Error received from \"${provider}\" for \"${title}\":\n (${url ? `${code}: ${url}` : code}).",
-        "unknownProviderError__i": "Error received from \"${provider}\" for \"${title}\":\n ${error}",
-        "exportError__i": "Could not save selections package folder: ${error}",
-        "importJSONFailError__i": "Could not import selections, JSON was malformed: ${error}",
+        "controllerSaveError__i": "Erreur de contrôleur (les raccourcis et les images seront ajoutés): ${error}",
+        "retryingDownload__i": "Le téléchargement de l'image depuis \"${imageUrl}\" a échoué pour \"${appTitle}\".",
+        "providerError__i": "Erreur réception de \"${provider}\" pour \"${title}\":\n (${url ? `${code}: ${url}` : code}).",
+        "unknownProviderError__i": "Erreur réception de \"${provider}\" pour \"${title}\":\n ${error}",
+        "exportError__i": "Impossible d'enregistrer le dossier de paquets sélectionné: ${error}",
+        "importJSONFailError__i": "Impossible d'importer les sélections, JSON a été malformé: ${error}",
         "importFailError__i": "Impossible d'importer les choix d'image: ${error}"
       },
       "success": {
@@ -80,6 +83,9 @@
     }
   },
   "steamParser": {
+    "onlyGamesTitle": "Find artwork for games only (no tools)",
+    "onlyInstalledTitle": "Find artwork for installed titles only",
+    "sourceModsTitle": "Find artwork for unofficial source mods",
     "errors": {
       "directoryInvalid": "> Répertoire Steam invalide.",
       "noSteamAccounts": "> Le répertoire Steam spécifié n'a aucun compte.",
@@ -89,12 +95,14 @@
   },
   "manualParser": {
     "manifestsInputTitle": "Manifests Directory",
+    "manifestsInputPlaceholder": "/path/to/your/manifests/",
     "errors": {
       "fatalError__i": "> Manual parser failed with fatal error:\n ${error}"
     }
   },
   "epicParser": {
-    "manifestsInputTitle": "Manifests Directory Override",
+    "manifestsInputTitle": "Epic Manifests Directory Override",
+    "manifestsInputPlaceholder": "/path/to/Manifests/",
     "launcherModeInputTitle": "Lancer les jeux via Epic pour les services en ligne",
     "errors": {
       "invalidManifestsOverride": "> Manifests Override is not a valid directory.",
@@ -105,21 +113,24 @@
   },
   "legendaryParser": {
     "legendaryInstalledFileTitle": "Legendary installed.json Path Override",
+    "legendaryInstalledFilePlaceholder": "/chemin/vers/legendary/installed.json",
     "errors": {
       "legendaryNotInstalled": "> Legendary installed.json not found",
       "fatalError__i": "> L'analyseur Legendary a échoué avec une erreur fatale:\n ${error}"
     }
   },
   "UWPParser": {
-    "UWPDirTitle": "Répertoire des jeux",
-    "UWPLauncherModeTitle": "Launch game as UWP instead of launcher helper.",
+    "UWPDirTitle": "XboxGames Directory Override",
+    "UWPDirPlaceholder": "/chemin/vers/XboxGames ou /chemin/vers/WindowsApps",
+    "UWPLauncherModeTitle": "Launch game as UWP instead of launcher helper",
     "errors": {
       "fatalError__i": "> UWP parser is not compatible in this platform.",
       "UWPNotCompatible": "> UWP parser failed with fatal error:\n ${error}"
     }
   },
   "uplayParser": {
-    "uplayDirTitle": "Uplay Directory Override",
+    "uplayDirTitle": "Ubisoft Directory Override",
+    "uplayDirPlaceholder": "/chemin/vers/Ubisoft/",
     "launcherModeInputTitle": "Lancer les jeux via UPlay pour les services en ligne",
     "errors": {
       "invalidManifestsOverride": "> Uplay Directory Override is not a valid directory.",
@@ -131,6 +142,7 @@
   },
   "gogParser": {
     "galaxyExeOverrideTitle": "Galaxy Path Override",
+    "galaxyExeOverridePlaceholder": "/chemin/vers/GalaxyClient.exe",
     "launcherModeInputTitle": "Lancer les jeux via GOG Galaxy",
     "errors": {
       "invalidGalaxyExeOverride": "> Galaxy Client Override is not a valid path.",
@@ -141,6 +153,7 @@
   },
   "amazonGamesParser": {
     "exeOverrideTitle": "Amazon Games Path Override",
+    "exeOverridePlaceholder": "/chemin/vers/Amazon Games.exe",
     "launcherModeInputTitle": "Lancer les jeux via Amazon Games",
     "errors": {
       "invalidExeOverride": "> Amazon Games Installation Override is not a valid directory.",
@@ -150,8 +163,10 @@
     }
   },
   "itchIoParser": {
-    "itchIoAppDataOverrideTitle": "itch.io AppData Path Override",
+    "itchIoAppDataOverrideTitle": "itch.io AppData Directory Override",
+    "itchIoAppDataOverridePlaceholder": "/chemin/vers/itch",
     "itchIoWindowsOnLinuxInstallDriveRedirectTitle": "Windows-on-Linux Install Drive Redirect",
+    "itchIoWindowsOnLinuxInstallDriveRedirectPlaceholder": "/mnt/d/",
     "errors": {
       "invalidItchIoAppDataOverride": "> itch.io AppData Override is not a valid directory.",
       "invalidItchIoWindowsOnLinuxInstallDriveRedirect": "> itch.io Windows-on-Linux Install Drive Redirect is not a valid directory.",
@@ -161,11 +176,12 @@
     }
   },
   "eaDesktopParser": {
-    "eaGamesDirTitle": "Répertoire d'installation EA Games",
+    "eaGamesDirTitle": "EA Games Directory Override",
+    "eaGamesDirPlaceholder": "/chemin/vers/EA Games/",
     "eaLauncherModeTitle": "Lancer les jeux via EA Desktop",
     "errors": {
       "fatalError__i": "> EA Desktop parser failed with fatal error:\n ${error}",
-      "invalidXML__i": "> Invalid XML file ${dataFile}",
+      "invalidXML__i": "> Fichier XML invalide ${dataFile}",
       "eaNotCompatible": "> EA Desktop Parser only supports Windows."
     }
   },
@@ -184,12 +200,12 @@
   },
   "globParser": {
     "inputTitle": "User's glob",
+    "inputPlaceholder": "${title}.@(iso|ISO)",
     "errors": {
       "noTitle__md": "> File glob must contain `${title}`!",
       "moreThanOneTitle__md": "> File glob must contain only one `${title}`!",
       "noStarNextToTitle__md": "> Star `*` can not be next to `${title}`!",
       "noAnyCharNextToTitle__md": "> Any char `?` can not be next to `${title}`!",
-      "noWindowsSlash__md": "> Windows directory character `\\` is not allowed! Use `/` instead.",
       "noGlobstarOnBothSides__md": "> Globstar `**` can only be on one side of `${title}`!",
       "noBracedDirSetOnBothSides__md": "> A braced set, containing at least one slash `/` can only be on one side of `${title}`!",
       "noBracedDirSetOrGlobstarOnBothSides__md": "> A braced set, containing at least one slash `/` and a globstar `**` can only be on one side of `${title}`!",
@@ -201,12 +217,12 @@
   },
   "globRegexParser": {
     "inputTitle": "User's glob-regex",
+    "inputPlaceholder": "${/valid regex/}",
     "errors": {
       "noRegex__md": "> File glob must contain `${regex}` where **regex** is your regular expression!",
       "moreThanOneRegex__md": "> File glob must contain only one `${regex}`!",
       "noStarNextToRegex__md": "> Star `*` can not be next to `${regex}`!",
       "noAnyCharNextToRegex__md": "> Any char `?` can not be next to `${regex}`!",
-      "noWindowsSlash__md": "> Windows directory character `\\` is not allowed! Use `/` instead.",
       "noGlobstarOnBothSides__md": "> Globstar `**` can only be on one side of `${regex}`!",
       "noBracedDirSetOnBothSides__md": "> A braced set, containing at least one slash `/` can only be on one side of `${regex}`!",
       "noBracedDirSetOrGlobstarOnBothSides__md": "> A braced set, containing at least one slash `/` and a globstar `**` can only be on one side of `${regex}`!",
@@ -227,14 +243,16 @@
   },
   "logger": {
     "component": {
-      "noMessages": "No messages are available",
+      "noMessages": "Aucun message disponible",
       "error": "ERREUR",
       "info": "INFO",
       "success": "Succès",
       "fuzzy": "FUZZY",
       "textWrap": "RETOUR À LA LIGNE",
       "autoscroll": "DÉFILEMENT-AUTO",
-      "clearLog": "Effacer les logs"
+      "clearLog": "Effacer les logs",
+      "issueDescription": "Thorough issue description with passable spelling.",
+      "handleExample": "CoolHandle#1234"
     }
   },
   "customVariables": {
@@ -246,7 +264,7 @@
         "corruptedVariables__i": "Saved custom variables are invalid!\r\nPermanent variable saving is disabled until this issue is resolved.\r\nTry to manually fix errors yourself (file - ${file})\r\nor seek help on github or our official discord channel: ${error}"
       },
       "info": {
-        "downloaded": "Custom variables file has been downloaded."
+        "downloaded": "Le fichier de variables personnalisées a été téléchargé."
       }
     }
   },
@@ -259,8 +277,7 @@
         "corruptedVariables__i": "Saved configuration presets are invalid!\r\nPermanent file saving is disabled until this issue is resolved.\r\nTry to manually fix errors yourself (file - ${file})\r\nor seek help on github or our official discord channel: ${error}"
       },
       "info": {
-        "updatingPresets": "Local config presets are out of date. Updating now.",
-        "downloaded": "New config preset file has been downloaded."
+        "downloaded": "New config presets have been downloaded."
       }
     }
   },
@@ -268,44 +285,45 @@
     "component": {
       "label": {
         "general": "Paramètres généraux",
-        "imageProviders": "Image provider settings",
+        "imageProviders": "Paramètres du fournisseur d'images",
         "fuzzy": "Paramètres de correspondance approximative",
-        "environmentVariables": "Environment variable settings",
-        "communityPresets": "Community variable/preset settings"
+        "environmentVariables": "Paramètres des variables d'environnement",
+        "communityPresets": "Paramètres de variable/préréglage de la communauté"
       },
       "text": {
         "offlineMode": "Mode hors ligne",
         "removeApps_desc": "toutes les entrées d'application et contrôleur ajoutées",
         "removeApps_btn": "Retirer",
-        "preloadImages": "Preload retrieved images immediately",
+        "preloadImages": "Précharger toutes les images trouvées",
         "fuzzy_verbose": "Log matching results",
         "fuzzy_filter": "Filter images",
-        "enabledProviders": "Enabled providers:",
-        "selectLanguage": "Sélectionner la langue:",
+        "enabledProviders": "Activés fournisseurs d'images",
+        "selectLanguage": "Select language",
+        "selectTheme": "Select theme",
         "resetFuzzy_desc": "fuzzy list",
         "resetFuzzyCache_desc": "fuzzy cache",
         "resetFuzzy_btn": "Réinitialiser",
-        "customVariables_desc": "custom variables",
-        "configPresets_desc": "config presets",
+        "customVariables_desc": "des variables personnalisées",
+        "configPresets_desc": "des configurations prédéfinies",
         "showSteamImages": "Afficher les images Steam actuelles par défaut",
         "deleteDisabledShortcuts": "Retirer les raccourcis pour les analyseurs désactivés",
         "clearLogOnTest": "Effacer automatiquement les logs avant de tester les analyseurs",
-        "configDir": "Open Config Directory"
+        "configDir": "Dossier de Configuration"
       },
       "placeholder": {
-        "noProviders": "None",
-        "steamDirectoryWin": "Typically C:\\Program Files (x86)\\Steam",
-        "steamDirectoryMac": "Typically ~/Library/Application Support/Steam",
-        "steamDirectoryLinux": "Typically /home/user/.steam/steam",
-        "romsDirectoryWin": "For example D:\\ROMs",
-        "romsDirectoryMac": "For example ~/ROMs",
-        "romsDirectoryLinux": "For example ~/ROMs",
+        "noProviders": "Aucun",
+        "steamDirectoryWin": "Généralement C:\\Program Files (x86)\\Steam",
+        "steamDirectoryMac": "Généralement ~/Library/Application Support/Steam",
+        "steamDirectoryLinux": "Généralement /home/user/.steam/steam",
+        "romsDirectoryWin": "Par exemple D:\\ROMs",
+        "romsDirectoryMac": "Par exemple ~/ROMs",
+        "romsDirectoryLinux": "Par exemple ~/ROMs",
         "retroarchPathWin": "Par exemple C:\\Chemin\\Vers\\retroarch.exe",
-        "retroarchPathLinux": "For example /path/to/retroarch",
-        "retroarchPathMac": "For example /path/to/retroarch",
-        "raCoresDirectoryWin": "Typically C:\\Users\\UserName\\AppData\\Roaming\\RetroArch\\cores",
-        "raCoresDirectoryLinux": "Typically /lib/x86_64-linux-gnu/libretro/cores",
-        "raCoresDirectoryMac": "Typically /Applications/Retroarch.app/Contents/Resources/cores",
+        "retroarchPathLinux": "Par exemple /chemin/vers/retroarch",
+        "retroarchPathMac": "Par exemple /chemin/vers/retroarch",
+        "raCoresDirectoryWin": "Généralement C:\\Utilisateurs\\NomD'Utilisateurs\\AppData\\Roaming\\RetroArch\\cores",
+        "raCoresDirectoryLinux": "Généralement /lib/x86_64-linux-gnu/libretro/core",
+        "raCoresDirectoryMac": "Généralement /Applications/Retroarch.app/Contents/Resources/cores",
         "localImagesDirectoryWin": "For example C:\\Path\\To\\LocalArtwork",
         "localImagesDirectoryUnix": "For example ~/path/to/localartwork"
       }
@@ -325,9 +343,9 @@
     "component": {
       "about": "À propos",
       "preview": "Aperçu",
-      "logger": "Journal des événements",
+      "logger": "Journal des Événements",
       "settings": "Paramètres",
-      "parsers": "Analyseurs",
+      "parsers": "Analyseur",
       "customVariables": "Variables",
       "userExceptions": "Exceptions",
       "noTitle": "Aucun titre!"
@@ -386,66 +404,37 @@
         "missingAccountInfo__i": "  ${name}",
         "noAccountsWarning": "Attention! Aucun compte utilisateur trouvé, cela pourrait être dû à l'une des raisons ci-dessous:\n - répertoire Steam incorrect;\n - aucun utilisateur n'a jamais été connecté;\n - Steam n'enregistre pas les noms de compte (\"Afficher les options avancées -> Comptes utilisateur -> Utiliser les noms de compte\").\nSi vous voyez cela, l'aperçu ne sera pas généré pour cette configuration.",
         "cannotParseUserIDs": "Erreur lors de l'analyse des comptes utilisateur:",
-        "failedToMatch": "Failed to match:",
+        "failedToMatch": "Échec de la correspondance:",
         "failedFileInfo__i": "[${index}/${total}]: ${filename}",
         "testFailed": "Le test a échoué",
         "cannotTestInvalid": "Impossible de tester une configuration invalide!",
-        "cannotCopyInvalid": "Can not copy invalid configuration!",
-        "failedToCopy": "Failed to copy to clipbard!",
-        "cannotFetchTemplates": "Can not fetch controller templates for invalid steam directory!",
-        "errorRemovingControllers": "Error removing controllers:",
-        "cannotRemoveControllers": "Can not remove controllers from invalid steam directory!"
+        "cannotCopyInvalid": "Impossible de copier une configuration invalide!",
+        "failedToCopy": "Échec de la copie dans le presse-papier!",
+        "cannotFetchTemplates": "Impossible de récupérer les modèles de contrôleur d'un répertoire Steam invalide!",
+        "errorRemovingControllers": "Erreur lors de la suppression des contrôleurs:",
+        "cannotRemoveControllers": "Impossible de supprimer les contrôleurs d'un répertoire Steam invalide!"
       },
       "success": {
         "foundAccounts__i": "${count} compte(s) utilisateur disponible(s) trouvé:",
         "foundAccountInfo__i": "  ${name} (steamID64: ${steamID64}, accountID: ${accountID})",
         "steamCategory__i": "[${index}/${total}]:     Catégories Steam - ${steamCategory}",
         "steamCategoryInfo__i": "[${index}/${total}]:                        ${steamCategory}",
-        "appId__i": "[${index}/${total}]:                AppID - ${appid}",
-        "shortAppId__i": "[${index}/${total}]:      AppID Raccourci - ${appid}",
+        "exceptionKey__i": "[${index}/${total}]:         Exception ID - ${appid}",
+        "appId__i": "[${index}/${total}]:        Legacy App ID - ${appid}",
+        "shortAppId__i": "[${index}/${total}]:               App ID - ${appid}",
         "extractedTitle__i": "[${index}/${total}]:        Titre extrait - ${title}",
-        "fuzzyTitle__i": "[${index}/${total}]:          Fuzzy title - ${title}",
+        "fuzzyTitle__i": "[${index}/${total}]:   Titre approximatif - ${title}",
         "finalTitle__i": "[${index}/${total}]:          Titre final - ${title}",
         "filePath__i": "[${index}/${total}]:    Chemin du fichier - ${filePath}",
         "startDir__i": "[${index}/${total}]: Répertoire de départ - ${startDir}",
         "completeShortcut__i": "[${index}/${total}]:    Raccourci complet - ${shortcut}",
         "firstImageQuery__i": "[${index}/${total}]:     Requêtes d'image - ${query}",
         "imageQueries__i": "[${index}/${total}]:                        ${query}",
-        "resolvedDefaultImageGlob__i": "[${index}/${total}]:  Default image glob:",
-        "resolvedDefaultImageGlobInfo__i": "[${index}/${total}]:                        ${glob}",
-        "resolvedDefaultTallImageGlob__i": "[${index}/${total}]:  Default tall image glob:",
-        "resolvedDefaultTallImageGlobInfo__i": "[${index}/${total}]:                        ${glob}",
-        "resolvedDefaultHeroImageGlob__i": "[${index}/${total}]:  Default hero image glob:",
-        "resolvedDefaultHeroImageGlobInfo__i": "[${index}/${total}]:                        ${glob}",
-        "resolvedDefaultLogoImageGlob__i": "[${index}/${total}]:  Default logo image glob:",
-        "resolvedDefaultLogoImageGlobInfo__i": "[${index}/${total}]:                        ${glob}",
-        "resolvedDefaultIconGlob__i": "[${index}/${total}]:  Default icon glob:",
-        "resolvedDefaultIconGlobInfo__i": "[${index}/${total}]:                        ${glob}",
-        "defaultImageResolved__i": "[${index}/${total}]:       Default image:\r\n[${index}/${total}]:                        ${image}",
-        "defaultTallImageResolved__i": "[${index}/${total}]:       Default tall image:\r\n[${index}/${total}]:                        ${image}",
-        "defaultHeroImageResolved__i": "[${index}/${total}]:       Default hero image:\r\n[${index}/${total}]:                        ${image}",
-        "defaultLogoImageResolved__i": "[${index}/${total}]:       Default logo image:\r\n[${index}/${total}]:                        ${image}",
-        "defaultIconResolved__i": "[${index}/${total}]:       Default icon:\r\n[${index}/${total}]:                        ${image}",
-        "resolvedImageGlob__i": "[${index}/${total}]: Resolved image glob:",
-        "resolvedImageGlobInfo__i": "[${index}/${total}]:                        ${glob}",
-        "localImagesResolved__i": "[${index}/${total}]:     Resolved images:",
-        "localImageInfo__i": "[${index}/${total}]:                        ${image}",
-        "resolvedTallImageGlob__i": "[${index}/${total}]: Resolved tall image glob:",
-        "resolvedTallImageGlobInfo__i": "[${index}/${total}]:                        ${glob}",
-        "localTallImagesResolved__i": "[${index}/${total}]:     Resolved tall images:",
-        "localTallImageInfo__i": "[${index}/${total}]:                        ${image}",
-        "resolvedHeroImageGlob__i": "[${index}/${total}]: Resolved hero image glob:",
-        "resolvedHeroImageGlobInfo__i": "[${index}/${total}]:                        ${glob}",
-        "localHeroImagesResolved__i": "[${index}/${total}]:     Resolved hero images:",
-        "localHeroImageInfo__i": "[${index}/${total}]:                        ${image}",
-        "resolvedLogoImageGlob__i": "[${index}/${total}]: Resolved logo image glob:",
-        "resolvedLogoImageGlobInfo__i": "[${index}/${total}]:                        ${glob}",
-        "localLogoImagesResolved__i": "[${index}/${total}]:     Resolved logo images:",
-        "localLogoImageInfo__i": "[${index}/${total}]:                        ${image}",
-        "resolvedIconGlob__i": "[${index}/${total}]:  Resolved icon glob:",
-        "resolvedIconGlobInfo__i": "[${index}/${total}]:                        ${glob}",
-        "localIconsResolved__i": "[${index}/${total}]:      Resolved icons:",
-        "localIconInfo__i": "[${index}/${total}]:                        ${icon}",
+        "defaultImage__i": "[${index}/${total}]: Resolved fallback ${artworkType}:\r\n[${index}/${total}]:                        ${image}",
+        "resolvedDefaultImage__i": "[${index}/${total}]: Fallback ${artworkType}:",
+        "localImages__i": "[${index}/${total}]: Resolved ${artworkType}:",
+        "resolvedLocalImages__i": "[${index}/${total}]: ${artworkType} glob:",
+        "indexInfo__i": "[${index}/${total}]:                        ${indexed}",
         "removedControllers__i": "Contrôleurs supprimés avec succès pour l'analyseur: ${configTitle}",
         "fetchedTemplates": "Tous les modèles de contrôleur ont été récupérés"
       },
@@ -465,26 +454,30 @@
         "executableArgs": "Command line arguments",
         "onlineImageQueries": "Online image query",
         "imagePool": "Image pool",
-        "imageProviders": "Image providers",
-        "defaultImage": "Image par défaut",
-        "defaultTallImage": "Poster par défaut",
-        "defaultHeroImage": "Image d'arrière-plans par défaut",
-        "defaultLogoImage": "Logo par défaut",
-        "defaultIcon": "Icône par défaut",
-        "localImages": "Local images",
-        "localTallImages": "Local tall images",
-        "localHeroImages": "Local hero images",
-        "localLogoImages": "Local logo images",
-        "localIcons": "Local icons"
+        "imageProviders": "Fournisseurs d'images",
+        "defaultImage__i": "${artworkType} par défaut",
+        "localImages__i": "Local ${artworkType} glob"
       },
       "placeholder": {
         "parserType": "Sélectionner analyseur...",
+        "configTitle": "Mon Super Analyseur",
+        "steamCategory": "${cat1}${cat2}",
+        "steamDirectory": "${steamdirglobal} ou /chemin/vers/Steam",
+        "userAccounts": "${steamuser1}${steamuser2}",
+        "titleFromVariable": "${myvariable}",
+        "titleModifier": "${fuzzyTitle} or ${title}",
+        "defaultImage__i": "/chemin/vers/${artworkType}_pardefaut.png",
+        "localImages__i": "/path/to/art/${artworkType}/\\${title}.@(png|jpg)",
+        "romDirectory": "/chemin/vers/jeux/",
+        "glob": "${title}.@(iso|ISO)",
+        "executableLocation": "Exemple: /chemin/vers/émulateur.exe",
+        "executableArgs": "--arg1 --arg2",
+        "executableModifier": "\"${exePath}\"",
+        "startInDirectory": "/path/to/start/in/dir",
         "imageProviders": "Vide",
         "multiAPIPlaceholder": "Aucun filtre"
       },
       "text": {
-        "skipWithMissingDataDir": "Ignorer les comptes trouvés avec des données manquantes",
-        "useCredentials": "Utiliser les noms de compte",
         "tryToMatchTitle": "Enable Title from Custom Variable",
         "skipFileIfVariableWasNotFound": "Ignorer le fichier si la variable n'a pas été trouvée",
         "caseInsensitiveVariables": "Variables insensibles à la casse",
@@ -529,10 +522,10 @@
         "titleModifier__md": "> Title modifier must not be empty!",
         "executableModifier__md": "> Executable modifier must not be empty!",
         "variableString__md": "> Uneven number of `${` and `}` pairs. Use `\\` to escape `${` or `}` if you want to use them as characters.",
-        "imageProviders__md": "> Incorrect image providers type!",
+        "imageProviders__md": "> Type de fournisseur d'image incorrect!",
         "unhandledValidationKey__md": "> Input's validation is unhandled",
-        "genericDir__md": "> Directory is invalid",
-        "genericPath__md": "> Path is invalid"
+        "genericDir__md": "> Le répertoire est incorrect",
+        "genericPath__md": "> Le chemin est incorrect"
       },
       "text": {
         "noTitle": "No title!"
@@ -578,17 +571,19 @@
       "couldNotReadEntries__i": "Could not read required steam files:\n ${error}",
       "couldNotWriteEntries": "Could not write entries to steam files:",
       "couldNotMergeEntries__i": "Could not merge entries:\n ${error}",
-      "couldNotRemoveEntries__i": "Could not remove entries:\n ${error}"
+      "couldNotRemoveEntries__i": "Could not remove entries:\n ${error}",
+      "nonFatal": "Non fatal errors occurred while writing:"
     }
   },
   "vdfFile": {
     "error": {
-      "readingVdf__i": "Failed to read from \"${filePath}\". ${error}",
-      "writingVdf__i": "Failed to write to \"${filePath}\". ${error}",
-      "corruptedVdf__i": "\"${filePath}\" est corrompu. ${error}",
-      "creatingBackup__i": "Impossible de créer une backup pour \"${filePath}\". ${error}",
+      "readingVdf__i": "Failed to read from \"${filePath}\".\n ${error}",
+      "writingVdf__i": "Failed to write to \"${filePath}\".\n ${error}",
+      "skippingDMCA__i": "Skipping DMCA'd image for ${title}",
+      "corruptedVdf__i": "\"${filePath}\" is corrupted.\n ${error}",
+      "creatingBackup__i": "Could not create backup for \"${filePath}\".\n ${error}",
       "unsupportedMimeType__i": "Mime type (${type}) is unsupported (title - \"${title}\").",
-      "imageError__i": "Error occurred while saving/downloading image for \"${title}\". Url: ${url}. ${error}"
+      "imageError__i": "Error occurred while saving/downloading image for \"${title}\". Url: ${url}.\n ${error}"
     }
   },
   "helpers": {

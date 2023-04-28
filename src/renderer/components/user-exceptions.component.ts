@@ -20,6 +20,8 @@ export class ExceptionsComponent implements OnDestroy {
   private exceptionsForm: FormGroup;
   private exceptionsFormItems: FormArray;
 
+  private filterValue = '';
+
   constructor(
     private router: Router,
     private activatedRoute: ActivatedRoute,
@@ -63,7 +65,7 @@ export class ExceptionsComponent implements OnDestroy {
       items: this.formBuilder.array(Object.entries(this.userExceptions.titles)
         .map(e=>this.formBuilder.group(Object.assign({oldTitle: e[0]},e[1]))))
     });
-    this.exceptionsForm.valueChanges.subscribe((val)=>{
+    this.exceptionsForm.valueChanges.subscribe((val: any)=>{
       this.exceptionsService.setIsUnsaved(true);
       let error = this.exceptionsService.setCurrent({
         exceptionsVersion: this.userExceptions.exceptionsVersion,

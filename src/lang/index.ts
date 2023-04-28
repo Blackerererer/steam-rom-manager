@@ -63,71 +63,10 @@ function getMarkdown(langPath: string) {
           ],
           defaultImage: [
             require(`${langPath}/default-image.md`),
-            require(`${langPath}/special-glob-input.md`),
-            require(`${langPath}/parser-variables.md`),
             require(`${langPath}/parser-env-variables.md`),
-            require(`${langPath}/spec-glob-chars.md`)
           ],
-          defaultTallImage: [
-            require(`${langPath}/default-tall-image.md`),
-            require(`${langPath}/special-glob-input.md`),
-            require(`${langPath}/parser-variables.md`),
-            require(`${langPath}/parser-env-variables.md`),
-            require(`${langPath}/spec-glob-chars.md`)
-          ],
-          defaultHeroImage: [
-            require(`${langPath}/default-hero-image.md`),
-            require(`${langPath}/special-glob-input.md`),
-            require(`${langPath}/parser-variables.md`),
-            require(`${langPath}/parser-env-variables.md`),
-            require(`${langPath}/spec-glob-chars.md`)
-          ],
-          defaultIcon: [
-            require(`${langPath}/default-icon.md`),
-            require(`${langPath}/special-glob-input.md`),
-            require(`${langPath}/parser-variables.md`),
-            require(`${langPath}/parser-env-variables.md`),
-            require(`${langPath}/spec-glob-chars.md`)
-          ],
-          defaultLogoImage: [
-            require(`${langPath}/default-logo-image.md`),
-            require(`${langPath}/special-glob-input.md`),
-            require(`${langPath}/parser-variables.md`),
-            require(`${langPath}/parser-env-variables.md`),
-            require(`${langPath}/spec-glob-chars.md`)
-          ],
-
           localImages: [
             require(`${langPath}/local-images.md`),
-            require(`${langPath}/special-glob-input.md`),
-            require(`${langPath}/parser-variables.md`),
-            require(`${langPath}/parser-env-variables.md`),
-            require(`${langPath}/spec-glob-chars.md`)
-          ],
-          localTallImages: [
-            require(`${langPath}/local-tall-images.md`),
-            require(`${langPath}/special-glob-input.md`),
-            require(`${langPath}/parser-variables.md`),
-            require(`${langPath}/parser-env-variables.md`),
-            require(`${langPath}/spec-glob-chars.md`)
-          ],
-          localHeroImages: [
-            require(`${langPath}/local-hero-images.md`),
-            require(`${langPath}/special-glob-input.md`),
-            require(`${langPath}/parser-variables.md`),
-            require(`${langPath}/parser-env-variables.md`),
-            require(`${langPath}/spec-glob-chars.md`)
-          ],
-          localLogoImages: [
-            require(`${langPath}/local-logo-images.md`),
-            require(`${langPath}/special-glob-input.md`),
-            require(`${langPath}/parser-variables.md`),
-            require(`${langPath}/parser-env-variables.md`),
-            require(`${langPath}/spec-glob-chars.md`)
-          ],
-
-          localIcons: [
-            require(`${langPath}/local-icons.md`),
             require(`${langPath}/special-glob-input.md`),
             require(`${langPath}/parser-variables.md`),
             require(`${langPath}/parser-env-variables.md`),
@@ -139,6 +78,11 @@ function getMarkdown(langPath: string) {
     about: {
       component: {
         info__md: [require(`${langPath}/about.md`)]
+      }
+    },
+    parsersList: {
+      component: {
+        info__md: [require(`${langPath}/parsers-list.md`)]
       }
     },
     logger: {
@@ -169,6 +113,9 @@ function getMarkdown(langPath: string) {
       docs__md: {
         self: [
           require(`${langPath}/steam-parser.md`)
+        ],
+        input: [
+          require(`${langPath}/steam-parser-input.md`)
         ]
       }
     },

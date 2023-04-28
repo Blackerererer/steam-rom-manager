@@ -3,6 +3,7 @@ import { NG_VALUE_ACCESSOR, ControlValueAccessor } from '@angular/forms';
 import * as rangy from 'rangy';
 import * as he from 'he';
 import * as path from 'path';
+import { escape } from 'glob';
 
 @Component({
   selector: 'ng-text-input',
@@ -71,12 +72,13 @@ export class NgTextInputComponent implements ControlValueAccessor {
   }
 
   private setInnerHtml(data: string, selection?: { start: number, end: number }) {
-    if (this.elementRef.nativeElement) {
-      if (data) {
+    if (this.elementRef && this.elementRef.nativeElement) {
+      if (data && data.length) {
         selection = selection || (document.activeElement === this.elementRef.nativeElement && data.length > 0 ? this.saveSelection(this.elementRef.nativeElement) : null);
 
-        if (this.highlight)
+        if (this.highlight) {
           data = this.highlight(data, this.highlightTag || 'highlight');
+        }
         data = he.encode(data);
         if (this.highlight) {
           data = data.replace(new RegExp(`&#x3C;.*?${this.highlightTag || 'highlight'}.*?&#x3E;`, 'g'), (match: string) => {
@@ -86,11 +88,13 @@ export class NgTextInputComponent implements ControlValueAccessor {
 
         this.renderer.setProperty(this.elementRef.nativeElement, 'innerHTML', data);
 
-        if (selection)
+        if (selection) {
           this.restoreSelection(this.elementRef.nativeElement, selection);
+        }
       }
-      else
+      else {
         this.renderer.setProperty(this.elementRef.nativeElement, 'innerHTML', null);
+      }
     }
   }
 
@@ -174,8 +178,6 @@ export class NgTextInputComponent implements ControlValueAccessor {
 
   constructor(private changeRef: ChangeDetectorRef, private renderer: Renderer2) { }
 
-  @Input()
-
   set value(value: string) {
     this.writeValue(value);
   }
@@ -187,8 +189,17 @@ export class NgTextInputComponent implements ControlValueAccessor {
   writeValue(value: string, updateDom: boolean = true, selection?: { start: number, end: number }): void {
     let previousValue = this.currentValue;
     if (value !== this.currentValue) {
-      if(value&&value.split('&:&')[0]=='_browse_'){
-        value = this.appendGlob? path.resolve(value.split('&:&')[1],path.basename(this.currentValue)||this.appendGlob).replace(/\\/g,'/'):value.split('&:&')[1];
+      if(value && value.split('&:&')[0]=='_browse_'){
+        const selectedPath = value.split('&:&')[1]
+        if(this.appendGlob) {
+          const swapString = '$:$:$'
+          const t1 = escape(selectedPath.replaceAll('\\','/'));
+          const t2 = t1.replaceAll('\\', swapString)
+          const t3 = path.resolve(t2, path.basename(this.currentValue) || this.appendGlob)
+          value = t3.replaceAll('\\','/').replaceAll(swapString,'\\');
+        } else {
+          value = selectedPath;
+        }
       }
       this.currentValue = value;
       if (updateDom || this.highlight)
@@ -206,5 +217,10 @@ export class NgTextInputComponent implements ControlValueAccessor {
 
   registerOnTouched(fn: () => any): void {
     this.onTouched = fn;
+  }
+
+  ngAfterViewInit() {
+    // Had to do this to get the placeholder to appear in certain exceptions/logger
+    this.renderer.setProperty(this.elementRef.nativeElement, 'innerHTML', this.currentValue || null);
   }
 }

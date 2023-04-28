@@ -1,6 +1,6 @@
-import { xRequestError, xRequestOptions, xRequestOptionsWithUrl, xRequestResolve } from "../models";
+import { xRequestError, xRequestOptions, xRequestOptionsWithUrl, xRequestResolve, StringMap } from "../models";
 
-const wait = (timeout: number) => new Promise((resolve) => setTimeout(resolve, timeout))
+const wait = (delay: number) => new Promise((resolve) => setTimeout(resolve, delay))
 
 export class xRequest {
   private cancellingPromises: boolean = false;
@@ -9,8 +9,11 @@ export class xRequest {
    */
   private cancelHandlerMap = new WeakMap<Promise<any>, () => void | undefined>()
   private promiseRef = new Set<Promise<any>>();
+  private defaultTimeout: number;
 
-  constructor(protected timeout: number = 3000) {}
+  constructor(protected timeout: number = 3000) {
+    this.defaultTimeout = timeout;
+  }
 
   /* Handle promises and their cancelation */
 
@@ -45,7 +48,7 @@ export class xRequest {
   /* Handle new requests */
 
   protected parseResponseHeaders(headers: string) {
-    let parsedHeaders = {};
+    let parsedHeaders: {[k:string]: string} = {};
     if (headers) {
       let headerPairs = headers.split('\u000d\u000a');
       for (let i = 0; i < headerPairs.length; i++) {
@@ -68,19 +71,21 @@ export class xRequest {
       let xhr = new XMLHttpRequest();
       let finalUrl = options.url;
       let paramsString: string = null;
-
-      if (options.params && typeof options.params === 'object') {
-        paramsString = Object.keys(options.params).map(function (key) {
-          return encodeURIComponent(key) + '=' + encodeURIComponent(options.params[key]);
-        }).join('&');
-      } else if(typeof options.params==='string'){
-        paramsString = options.params || null;
+      if(options.params) {
+        if(typeof options.params === 'string') {
+          paramsString = options.params || null;
+        } else {
+          paramsString = Object.keys(options.params).map(function (key) {
+            return encodeURIComponent(key) + '=' + encodeURIComponent((options.params as StringMap)[key]);
+          }).join('&');
+        }
       }
 
       if (options.method === 'GET' && paramsString)
         finalUrl = `${finalUrl}?${paramsString}`;
 
       xhr.responseType = options.responseType || '';
+      xhr.timeout = options.timeout !== undefined ? options.timeout : self.defaultTimeout;
 
       xhr.onload = function () {
         if (xhr.status >= 200 && xhr.status < 300) {

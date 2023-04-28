@@ -1,20 +1,18 @@
-@import 'mixins';
+@import "mixins";
 
 :host {
-	display: flex;
-	overflow-y: auto;
-	flex-direction: column;
+  display: flex;
+  overflow-y: auto;
+  flex-direction: var(--nav-direction);
 
-	min-width: 7em;
-	width: var(--nav-width);
-	max-width: 25vw;
+  min-width: 7em;
+  width: var(--nav-width);
+  max-width: var(--nav-width-max);
 
-	white-space: nowrap;
+  white-space: nowrap;
 
-	--link-height: 1.2em;
-	--link-vPadding: 0.5em;
-	grid-area: nav;
-	@include webkitScrollbar(nav-scrollbar, 0.375em);
+  grid-area: nav;
+  @include webkitScrollbar(nav-scrollbar, 0.375em);
   .parsers {
     .parserlink {
       width: 64%;
@@ -26,7 +24,7 @@
       display: flex;
       flex-direction: column;
 
-      margin: 0.1em 0 .1em 0;
+      margin: 0.1em 0 0.1em 0;
       padding-left: 0em;
 
       .inlineGroup {
@@ -44,143 +42,144 @@
       }
     }
   }
-	nav-link {
-		height: var(--link-height);
-		padding: var(--link-vPadding) 1em;
-
-		color: var(--color-nav-link-text);
-		border-left: solid 2px var(--color-nav-link-border);
-
-		svg {
-			height: var(--link-height);
-			width: 1em;
-      margin-bottom:-4px;
+  nav-link {
+    color: var(--color-nav-link-text);
+    border-left: solid 2px var(--color-nav-link-border);
+    height: auto;
+    img {
+      display: var(--img-nav-link-display);
+    }
+    svg {
+      height: var(--link-height);
+      width: 1em;
+      margin-bottom: -4px;
       margin-left: -5px;
-			polyline {
-				stroke: var(--color-nav-link-text);
-			}
-		}
+      polyline {
+        stroke: var(--color-nav-link-text);
+      }
+    }
 
-		&:hover {
-			color: var(--color-nav-link-text-hover);
-			border-color: var(--color-nav-link-border-hover);
+    &:hover {
+      color: var(--color-nav-link-text-hover);
+      border-color: var(--color-nav-link-border-hover);
+      background: var(--color-nav-link-bg-hover);
 
-			svg {
-				polyline {
-					stroke: var(--color-nav-link-text-hover);
-				}
-			}
+      svg {
+        polyline {
+          stroke: var(--color-nav-link-text-hover);
+        }
+      }
 
-			&.active {
-				color: var(--color-nav-link-text-active);
-				border-color: var(--color-nav-link-border-active);
+      &.active {
+        color: var(--color-nav-link-text-active);
+        border-color: var(--color-nav-link-border-active);
+        background-color: var(--color-nav-link-background-active);
+        & svg {
+          & polyline {
+            stroke: var(--color-nav-link-text-active);
+          }
+        }
+      }
+    }
 
-				& svg {
-					& polyline {
-						stroke: var(--color-nav-link-text-active);
-					}
-				}
-			}
-		}
+    &.active {
+      color: var(--color-nav-link-text-active);
+      border-color: var(--color-nav-link-border-active);
+      background-color: var(--color-nav-link-background-active);
+      svg {
+        & polyline {
+          stroke: var(--color-nav-link-text-active);
+        }
+      }
+    }
+  }
 
-		&.active {
-			color: var(--color-nav-link-text-active);
-			border-color: var(--color-nav-link-border-active);
-
-			svg {
-				& polyline {
-					stroke: var(--color-nav-link-text-active);
-				}
-			}
-		}
-	}
-
-	nav-expand {
+  nav-expand {
     nav-link.titlelink {
       padding: var(--link-vPadding) 2em var(--link-vPadding) 1em;
     }
-		nav-link:not(.titlelink) {
-			padding: var(--link-vPadding) 1em var(--link-vPadding) 2em;
+    nav-link:not(.titlelink) {
+      padding: var(--padding-nav-link-expand);
 
-			position: relative;
+      position: relative;
 
-			&::before {
-				top: 50%;
-				position: absolute;
-				content: "";
-				width: 0.5em;
-				height: 0.5em;
-				background-color: var(--color-nav-link-enabled);
-				border-radius: 50%;
-				margin: 0 0 0 -0.813em;
-				transform: translateY(-50%);
-			}
+      &::before {
+        top: 50%;
+        position: absolute;
+        content: "";
+        width: 0.5em;
+        height: 0.5em;
+        background-color: var(--color-nav-link-enabled);
+        border-radius: 50%;
+        display: var(--display-exceptions-save-status);
+        transform: translateY(-50%);
+      }
 
-			&:hover {
-				&::before {
-					background-color: var(--color-nav-link-enabled-hover);
-				}
+      &:hover {
+        &::before {
+          background-color: var(--color-nav-link-enabled-hover);
+        }
 
-				&.active {
-					&::before {
-						background-color: var(--color-nav-link-enabled-active);
-					}
-				}
-			}
+        &.active {
+          &::before {
+            background-color: var(--color-nav-link-enabled-active);
+          }
+        }
+      }
 
-			&.active {
-				&::before {
-					background-color: var(--color-nav-link-enabled-active);
-				}
-			}
+      &.active {
+        &::before {
+          background-color: var(--color-nav-link-enabled-active);
+        }
+      }
 
-			&.disabled {
-				&::before {
-					background-color: var(--color-nav-link-disabled);
-				}
+      &.disabled {
+        &::before {
+          background-color: var(--color-nav-link-disabled);
+        }
 
-				&:hover {
-					&::before {
-						background-color: var(--color-nav-link-disabled-hover);
-					}
+        &:hover {
+          &::before {
+            background-color: var(--color-nav-link-disabled-hover);
+          }
 
-					&.active {
-						&::before {
-							background-color: var(--color-nav-link-disabled-active);
-						}
-					}
-				}
+          &.active {
+            &::before {
+              background-color: var(--color-nav-link-disabled-active);
+            }
+          }
+        }
 
-				&.active {
-					&::before {
-						background-color: var(--color-nav-link-disabled-active);
-					}
-				}
-			}
+        &.active {
+          &::before {
+            background-color: var(--color-nav-link-disabled-active);
+          }
+        }
+      }
 
-			&.unsaved {
-				&::before {
-					background-color: var(--color-nav-link-unsaved);
-				}
+      &.unsaved {
+        &::before {
+          background-color: var(--color-nav-link-unsaved);
+        }
 
-				&:hover {
-					&::before {
-						background-color: var(--color-nav-link-unsaved-hover);
-					}
+        &:hover {
+          &::before {
+            background-color: var(--color-nav-link-unsaved-hover);
+          }
 
-					&.active {
-						&::before {
-							background-color: var(--color-nav-link-unsaved-active);
-						}
-					}
-				}
+          &.active {
+            &::before {
+              background-color: var(--color-nav-link-unsaved-active);
+            }
+          }
+        }
 
-				&.active {
-					&::before {
-						background-color: var(--color-nav-link-unsaved-active);
-					}
-				}
-			}
-		}
-	}
+        &.active {
+          &::before {
+            background-color: var(--color-nav-link-unsaved-active);
+          }
+        }
+      }
+    }
+  }
 }

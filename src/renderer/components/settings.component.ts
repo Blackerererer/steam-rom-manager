@@ -1,8 +1,10 @@
 import { Component, ChangeDetectionStrategy, ChangeDetectorRef, OnDestroy } from '@angular/core';
-import { SettingsService, ParsersService, PreviewService, LanguageService, ImageProviderService, FuzzyService, CustomVariablesService, ConfigurationPresetsService } from "../services";
+import { ActivatedRoute } from '@angular/router';
+import { SettingsService, ParsersService, PreviewService, LanguageService, ImageProviderService, FuzzyService, CustomVariablesService, ConfigurationPresetsService, IpcService } from "../services";
 import { APP } from '../../variables';
 import { AppSettings, SelectItem, userAccountData } from "../../models";
-import { Subscription } from 'rxjs';
+import { Subscription, BehaviorSubject } from 'rxjs';
+import { availableThemes } from "../../lib/themes";
 import * as os from 'os';
 import * as steam from "../../lib/helpers/steam";
 
@@ -17,6 +19,7 @@ export class SettingsComponent implements OnDestroy {
   private currentDoc: { activePath: string, content: string } = { activePath: '', content: '' };
   private settings: AppSettings;
   private availableProviders: string[];
+  private themes: string[];
   private availableLanguages: SelectItem[];
   private knownSteamDirectories: string[];
   private retroarchPathPlaceholder: string;
@@ -24,6 +27,7 @@ export class SettingsComponent implements OnDestroy {
   private romsDirectoryPlaceholder: string;
   private localImagesDirectoryPlaceholder: string;
   private raCoresDirectoryPlaceholder: string;
+  private CLI_MESSAGE: BehaviorSubject<string> = new BehaviorSubject("");
 
   constructor(private settingsService: SettingsService,
     private fuzzyService: FuzzyService,
@@ -33,9 +37,18 @@ export class SettingsComponent implements OnDestroy {
     private parsersService: ParsersService,
     private cpService: ConfigurationPresetsService,
     private cvService: CustomVariablesService,
-    private changeDetectionRef: ChangeDetectorRef) {
+    private changeDetectionRef: ChangeDetectorRef,
+    private activatedRoute: ActivatedRoute,
+    private ipcService: IpcService
+             ) {
 
     this.currentDoc.content = this.lang.docs__md.settings.join('');
+    this.activatedRoute.queryParamMap.subscribe((paramContainer: any)=> {
+      let params = ({...paramContainer} as any).params;
+      if(params['cliMessage']) {
+        this.CLI_MESSAGE.next(params['cliMessage']);
+      }
+    });
     }
 
   ngOnInit() {
@@ -52,6 +65,7 @@ export class SettingsComponent implements OnDestroy {
     this.availableLanguages = this.languageService.getAvailableLanguages().map((lang)=>{
       return {value: lang, displayValue: this.languageService.getReadableName(lang)}
     });
+    this.themes = availableThemes;
     if(os.type()=='Windows_NT'){
       this.retroarchPathPlaceholder = this.lang.placeholder.retroarchPathWin;
       this.steamDirectoryPlaceholder = this.lang.placeholder.steamDirectoryWin;
@@ -76,6 +90,18 @@ export class SettingsComponent implements OnDestroy {
     }
   }
 
+  ngAfterViewInit() {
+    this.subscriptions.add(this.CLI_MESSAGE.asObservable().subscribe((cliMessage: string)=> {
+      const parsedCLI = cliMessage ? JSON.parse(cliMessage)||{} : {};
+      if(['nuke'].includes(parsedCLI.command)) {
+        this.ipcService.send('log','Nuking steam library');
+        this.removeApps().then(()=> {
+          this.ipcService.send('all_done')
+        })
+      }
+    }))
+  }
+
   ngOnDestroy() {
     this.subscriptions.unsubscribe();
   }
@@ -93,13 +119,13 @@ export class SettingsComponent implements OnDestroy {
 
   private removeApps() {
     if (this.knownSteamDirectories.length > 0) {
-      this.previewService.saveData(true);
+      return this.previewService.saveData({removeAll: true, batchWrite: false});
     }
   }
 
   private removeControllersOnly() {
     for(let steamDir of this.knownSteamDirectories) {
-      steam.getAvailableLogins(steamDir, false).then((accounts: userAccountData[])=>{
+      steam.getAvailableLogins(steamDir).then((accounts: userAccountData[])=>{
         for(let account of accounts) {
           this.parsersService.removeControllers(steamDir, account.accountID);
         }
@@ -124,6 +150,12 @@ export class SettingsComponent implements OnDestroy {
 
   private loadLanguage(){
     this.languageService.loadLanguage(this.settings.language);
+  }
+
+  private loadTheme(){
+    document.querySelector('html').className = '';
+    document.querySelector('html').classList.add(this.settings.theme)
+    document.querySelector('html').removeAttribute("style");
   }
 
   configDir() {

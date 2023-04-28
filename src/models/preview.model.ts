@@ -34,6 +34,7 @@ export interface PreviewDataAppImage {
 
 export interface PreviewDataApp {
     entryId: number,
+    changedId?: string,
     status: 'add' | 'skip' | 'remove',
     configurationTitle: string,
     parserId: string,
@@ -46,11 +47,9 @@ export interface PreviewDataApp {
     title: string,
     extractedTitle: string,
     argumentString: string,
-    icons: PreviewDataAppImage,
-    tallimages: PreviewDataAppImage,
-    heroimages: PreviewDataAppImage,
-    logoimages: PreviewDataAppImage,
-    images: PreviewDataAppImage
+    images: {
+      [artworkType: string]: PreviewDataAppImage
+    }
 }
 
 export interface PreviewDataApps {
@@ -72,6 +71,7 @@ export interface PreviewVariables {
     listIsBeingGenerated: boolean,
     listIsBeingSaved: boolean,
     listIsBeingRemoved: boolean,
+    listHasGenerated: boolean,
     numberOfListItems: number,
     numberOfQueriedImages: number
 
@@ -82,15 +82,11 @@ export interface AppSelection {
   images: AppSelectionImages
 }
 
-export interface AppSelectionImages {  
-  grid: AppSelectionImage 
-  poster: AppSelectionImage,
-  hero: AppSelectionImage,
-  logo: AppSelectionImage,
-  icon: AppSelectionImage
+export interface AppSelectionImages {
+  [artworkType: string]: AppSelectionImage
 }
 
-export interface AppSelectionImage {  
+export interface AppSelectionImage {
   pool: string,
   filename: string
 }

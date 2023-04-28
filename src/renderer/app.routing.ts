@@ -1,7 +1,7 @@
 import { ModuleWithProviders } from '@angular/core';
 import { Routes, RouterModule } from '@angular/router';
 
-import { AppComponent, PreviewComponent, LoggerComponent, ParsersComponent, SettingsComponent, AboutComponent, ExceptionsComponent } from './components';
+import { AppComponent, PreviewComponent, LoggerComponent, ParsersComponent, SettingsComponent, AboutComponent, ExceptionsComponent, ParsersListComponent } from './components';
 import { HrefGuard } from './guards';
 
 const AppRouter: Routes = [
@@ -30,6 +30,10 @@ const AppRouter: Routes = [
         component: ParsersComponent
     },
     {
+        path: 'parsers-list',
+        component: ParsersListComponent
+    },
+    {
         path: 'about',
         component: AboutComponent
     },
@@ -40,6 +44,6 @@ const AppRouter: Routes = [
     }
 ];
 
-export const AppRoutes: ModuleWithProviders = RouterModule.forRoot(AppRouter, {
-    useHash: true, initialNavigation: false
+export const AppRoutes: ModuleWithProviders<RouterModule> = RouterModule.forRoot(AppRouter, {
+    useHash: true, initialNavigation: 'disabled'
 });

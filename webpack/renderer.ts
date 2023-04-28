@@ -1,5 +1,8 @@
-import * as HtmlWebpackPlugin from 'html-webpack-plugin';
-import * as MiniCssExtractPlugin from 'mini-css-extract-plugin';
+// import * as HtmlWebpackPlugin from 'html-webpack-plugin';
+// import * as MiniCssExtractPlugin from 'mini-css-extract-plugin';
+import HtmlWebpackPlugin from 'html-webpack-plugin';
+import MiniCssExtractPlugin from 'mini-css-extract-plugin';
+import CopyWebpackPlugin from 'copy-webpack-plugin';
 import { merge } from 'webpack-merge';
 import { Configuration } from 'webpack';
 
@@ -89,7 +92,7 @@ let clientConfig: Configuration = {
   node: false,
   externals: {
     leveldown: "require('leveldown')",
-    'better-sqlite3': "commonjs better-sqlite3"
+    'better-sqlite3': "commonjs better-sqlite3",
   }
 };
 
