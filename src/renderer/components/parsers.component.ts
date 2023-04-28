@@ -258,6 +258,9 @@ export class ParsersComponent implements AfterViewInit, OnDestroy {
                           return pType !== parsers[i];
                         });
                       },
+                      onValidate: (self, path) => {
+                        return this.parsersService.validate(path[0] as keyof UserConfiguration, { parser: parsers[i], input: inputFieldName, inputData: self.value });
+                      }
                     });
                   }
                 }

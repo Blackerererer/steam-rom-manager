@@ -297,6 +297,17 @@ function getMarkdown(langPath: string) {
         ]
       }
     },
+    scummvmParser: {
+      docs__md: {
+        self: [
+          require(`${langPath}/scummvm-parser.md`),
+          require(`${langPath}/scummvm-parser-input.md`)
+        ],
+        input: [
+          require(`${langPath}/scummvm-parser-input.md`)
+        ]
+      }
+    },    
     sgdbProvider: {
       docs__md: {
         self: [] as string[],

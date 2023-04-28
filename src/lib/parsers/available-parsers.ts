@@ -14,7 +14,8 @@ export const availableParserInputs: {[parserType: string]: string[]} = {
   'Steam': [],
   'UPlay': ['uplayDir','uplayLauncherMode'],
   'UWP': ['UWPDir', 'UWPLauncherMode'],
-  'EA Desktop': ['eaGamesDir','eaLauncherMode']
+  'EA Desktop': ['eaGamesDir','eaLauncherMode'],
+  'ScummVM': ['scummvmBinary', 'scummvmIni','useFlatpak']
 }
 
 export const availableParsers = Object.keys(availableParserInputs);
@@ -34,7 +35,8 @@ export const superTypes: {[superType: string]: string[]} = {
     'UPlay',
     'itch.io',
     'UWP',
-    'EA Desktop'
+    'EA Desktop',
+    'ScummVM'
   ]
 }
 

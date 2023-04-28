@@ -212,6 +212,22 @@ export interface languageStruct {
             fatalError__i: string
         }
     },
+    scummvmParser: {
+      scummvmBinaryTitle: string,
+      scummvmIniTitle: string,
+      useFlatpakTitle: string,
+      docs__md: {
+        self: string[],
+          input: string[]
+      }, errors: {
+        invalidScummvmBinary: string,
+        invalidScummvmIni: string,
+        scummvmNotCompatible: string,
+        scummvmNotInstalled: string,
+        flatpakUnavailableOnWindows: string,
+        fatalError__i: string
+      }
+    },    
     globParser: {
       inputTitle: string,
         docs__md: {

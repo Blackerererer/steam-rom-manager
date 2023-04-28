@@ -207,13 +207,13 @@ export class PreviewComponent implements OnDestroy {
 
   private addLocalImages(app: PreviewDataApp, imagetype?: string) {
     this.fileSelector.multiple = true;
-    this.fileSelector.accept = '.png, .jpeg, .jpg, .tga, .webp';
+    this.fileSelector.accept = '.png, .jpeg, .jpg, .tga, .webp, .ico';
     if(this.previewService.getImageType()!='games') {
       imagetype=this.previewService.getImageType()
     }
     this.fileSelector.onChange = (target) => {
       if (target.files) {
-        let extRegex = /png|tga|jpg|jpeg|webp/i;
+        let extRegex = /png|tga|jpg|jpeg|webp|ico/i;
         for (let i = 0; i < target.files.length; i++) {
           if (extRegex.test(path.extname(target.files[i].path))) {
             let imageUrl = url.encodeFile(target.files[i].path);

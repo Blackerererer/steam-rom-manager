@@ -139,7 +139,7 @@ export class FileParser {
           let filteredAccounts: { found: userAccountData[], missing: string[] } = this.filterUserAccounts(steamDirectory.data, userFilter, config.steamDirectory, config.userAccounts.skipWithMissingDataDir);
           let directories:string[] = undefined;
           if (superType === parserInfo.ROMType) {
-            directories = [config.romDirectory];
+            directories = [config.romDirectory, config.executable.path];
           }
           else if (superType === parserInfo.ManualType) {
             directories = [config.parserInputs["manualManifests"] as string];
@@ -244,6 +244,7 @@ export class FileParser {
           || config.parserInputs.uplayLauncherMode
           || config.parserInputs.UWPLauncherMode
           || config.parserInputs.eaLauncherMode
+          || config.parserType == 'ScummVM'
         );
         for(let j=0; j < data.success.length; j++) {
           let fuzzyTitle = data.success[j].fuzzyTitle || data.success[j].extractedTitle;
@@ -463,7 +464,7 @@ export class FileParser {
   private imagesPromise({config, settings, parsedConfig}: {config: UserConfiguration, settings: AppSettings, parsedConfig: ParsedUserConfiguration}) {
     return new Promise((resolve, reject) => {
       try {
-        let extRegex = /png|tga|jpg|jpeg|webp/i;
+        let extRegex = /png|tga|jpg|jpeg|webp|ico/i;
         let defaultPromises: Promise<void>[] = [];
         let localPromises: Promise<void>[]=[];
         let imageTypes = ["Image","TallImage","HeroImage","LogoImage","Icon"];

@@ -169,6 +169,19 @@
       "eaNotCompatible": "> EA Desktop Parser unterstützt nur Windows."
     }
   },
+  "scummvmParser": {
+    "scummvmBinaryTitle": "ScummVM Binary Path",
+    "scummvmIniTitle": "ScummVM Ini Path",
+    "useFlatpakTitle": "Use flatpak command-line (for Linux distributions using flatpak)",
+    "errors": {
+      "invalidScummvmBinary": "> ScummVM binary path a valid path.",
+      "invalidScummvmIni": "> ScummVM ini path a valid path.",
+      "fatalError__i": "> ScummVM parser failed with fatal error:\n ${error}",
+      "scummvmNotCompatible": "> ScummVM parser is currently only available on Windows and Linux.",
+      "scummvmNotInstalled": "> ScummVM does not appear to be installed.",
+      "flatpakUnavailableOnWindows": "> Flatpak cannot be activated on Windows."
+    }
+  },
   "globParser": {
     "inputTitle": "User's glob",
     "errors": {
