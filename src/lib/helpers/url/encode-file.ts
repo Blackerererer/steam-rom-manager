@@ -1,6 +1,5 @@
 import * as os from 'os';
 import * as fs from 'fs-extra'
-import * as path from 'path';
 import * as probe from 'probe-image-size';
 import * as uri2path from 'file-uri-to-path';
 
@@ -17,5 +16,6 @@ export function imageDimensions(file_uri: string) {
 
 export function encodeFile(file_path: string) {
   return encodeURI(`file:///${file_path.replace(/\\/g, '/')}`).replace(/#/g, '%23');
-}
+  }
+
 

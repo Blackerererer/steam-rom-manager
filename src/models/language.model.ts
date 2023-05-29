@@ -382,6 +382,7 @@ export interface languageStruct {
         steamDirectoryWin: string,
         steamDirectoryLinux: string,
         steamDirectoryMac: string,
+        userAccounts: string,
         romsDirectoryWin: string,
         romsDirectoryLinux: string,
         romsDirectoryMac: string,

@@ -17,7 +17,6 @@ export class NgNestedFormComponent implements OnInit {
   private hiddenSections: BehaviorSubject<{[sectionName: string]: boolean}>;
   private sectionMap: {[elementName: string]: string} = {};
   private validityObservables: (()=>Observable<string>)[] = [];
-  private dumb: IndexedFormControl;
   @Input() public parentForm: IndexedFormGroup;
   @Input() public groupName: string;
   @Input() public nestedGroup: NestedFormElement.Group;
@@ -96,7 +95,6 @@ export class NgNestedFormComponent implements OnInit {
         formControl['__path'] = formGroup['__path'].concat(childKey);
         formControl.reset({ value: child.initialValue || null, disabled: child.disabled || false }, { onlySelf: true, emitEvent: false });
 
-        // let callbacks: ValidatorFn[] = [];
         let callbacks: ((c: IndexedFormControl) => ValidationErrors)[] = [];
         if (child.onValidate) {
           callbacks.push((c) => {

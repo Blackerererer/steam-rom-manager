@@ -19,6 +19,7 @@ import {
   SteamTree,
   userAccountData,
   VDF_ExtraneousItemsData,
+  VDF_AddedCategoriesData,
   VDF_AllScreenshotsOutcomes,
   ErrorData, AppSelection,
   AppSelectionImages,
@@ -58,7 +59,7 @@ export class PreviewService {
   private appImages: {[artworkType: string]: AppImages};
   private currentImageType: string;
   private batchProgress: BehaviorSubject<{update: string, batch: number}>;
-
+  private categoryManager: CategoryManager;
   constructor(private parsersService: ParsersService, private loggerService: LoggerService, private imageProviderService: ImageProviderService, private settingsService: SettingsService, private http: HttpClient) {
     this.previewData = undefined;
     this.previewVariables = {
@@ -69,6 +70,7 @@ export class PreviewService {
       numberOfQueriedImages: 0,
       numberOfListItems: 0
     };
+    this.categoryManager = new CategoryManager();
     this.previewDataChanged = new Subject<void>();
     this.batchProgress = new BehaviorSubject({update: "", batch: -1})
     this.settingsService.onLoad((appSettings: AppSettings) => {
@@ -150,6 +152,14 @@ export class PreviewService {
       })
     }
   }
+  async removeCategories(steamDir: string, userId: string) {
+    try {
+      await this.categoryManager.removeAllCategoriesAndWrite(steamDir, userId);
+    } catch(error) {
+      this.loggerService.error(this.lang.errors.categorySaveError, { invokeAlert: true, alertTimeout: 3000 });
+      this.loggerService.error(this.lang.errors.categorySaveError__i.interpolate({error:error.message}));
+    }
+  }
 
   saveData({batchWrite, removeAll}: {batchWrite: boolean, removeAll: boolean}): Promise<any> {
 
@@ -168,11 +178,9 @@ export class PreviewService {
     }
 
     let vdfManager = new VDF_Manager();
-    let categoryManager = new CategoryManager();
-    let controllerManager = new ControllerManager();
     this.previewVariables.listIsBeingSaved = true;
-
-    let extraneousAppIds: VDF_ExtraneousItemsData = undefined;
+    let exAppIds: VDF_ExtraneousItemsData = undefined;
+    let addedCats: VDF_AddedCategoriesData = undefined;
     let chain: Promise<any> =  Promise.resolve().then(()=>{
       this.loggerService.info(this.lang.info.populatingVDF_List, { invokeAlert: true, alertTimeout: 3000 });
       return vdfManager.prepare(removeAll ? knownSteamDirectories : this.previewData)
@@ -196,12 +204,15 @@ export class PreviewService {
         return vdfManager.removeAllAddedEntries()
       })
     }
-    chain = chain.then((exAppIds: VDF_ExtraneousItemsData) => {
-      extraneousAppIds = exAppIds;
+    chain = chain.then(({extraneousAppIds, addedCategories}: {extraneousAppIds: VDF_ExtraneousItemsData, addedCategories: VDF_AddedCategoriesData}) => {
+      exAppIds = extraneousAppIds; //Non artwork-only extraneous app ids
+      addedCats = addedCategories; //Added categories for all app ids
     })
     .then(() => {
       this.loggerService.info(this.lang.info.savingCategories)
-      return categoryManager.save(this.previewData, extraneousAppIds, removeAll)
+      if(!removeAll) {
+        return this.categoryManager.save(this.previewData, exAppIds, addedCats)
+      }
     }).catch((error: Acceptable_Error | Error) => {
       if(error instanceof Acceptable_Error) {
         this.loggerService.error(this.lang.errors.categorySaveError, { invokeAlert: true, alertTimeout: 3000 });
@@ -212,7 +223,10 @@ export class PreviewService {
     })
     .then(() => {
       this.loggerService.info(this.lang.info.savingControllers)
-      return controllerManager.save(this.previewData, extraneousAppIds, removeAll)
+      if(!removeAll) {
+        const controllerManager = new ControllerManager();
+        return controllerManager.save(this.previewData, exAppIds)
+      }
     }).catch((error: Acceptable_Error | Error) => {
       if(error instanceof Acceptable_Error) {
         this.loggerService.error(this.lang.errors.controllerSaveError, { invokeAlert: true, alertTimeout: 3000 });
@@ -225,18 +239,17 @@ export class PreviewService {
       if (removeAll) {
         this.loggerService.info(this.lang.info.removingVDF_entries)
       } else {
-        this.loggerService.info(this.lang.info.writingVDF_entries__i.interpolate({ batchSize: 500 }), { invokeAlert: true, alertTimeout: 3000 })
+        this.loggerService.info(this.lang.info.writingVDF_entries__i.interpolate({ batchSize: this.appSettings.batchDownloadSize }), { invokeAlert: true, alertTimeout: 3000 })
       }
       if (batchWrite) {
         vdfManager.getBatchProgress().subscribe(({update, batch}: {update: string, batch: number})=> {
-          console.log("batch", batch, update)
           if(batch > -1) {
             this.loggerService.info(update, {invokeAlert: true, alertTimeout: 3000})
             this.batchProgress.next({update: update, batch: batch})
           }
         })
       }
-      return vdfManager.write(batchWrite);
+      return vdfManager.write(batchWrite, this.appSettings.batchDownloadSize);
     })
     .then(({nonFatal, outcomes}: {nonFatal: VDF_Error, outcomes: VDF_AllScreenshotsOutcomes})=> {
       if(nonFatal) {
@@ -272,13 +285,15 @@ export class PreviewService {
           const longId = steam.lengthenAppId(shortId);
           const imageType = invertedArtworkIdDict[gridName.replace(/^\d+/,'')];
           const steamImageUrl = url.encodeFile(outcomes[steamDirectory][userId].successes[gridName]);
-          if(this.previewData[steamDirectory][userId].apps[longId]) {
+          const app = this.previewData[steamDirectory][userId].apps[longId];
+          if(app && imageType) {
             this.previewData[steamDirectory][userId].apps[longId].images[imageType].steam = {
               imageProvider: 'Steam',
               imageUrl: steamImageUrl,
               imageRes: url.imageDimensions(steamImageUrl),
               loadStatus: 'done'
             }
+            this.setImageIndex(app, 0, imageType, true);
           }
         }
       }
@@ -729,31 +744,12 @@ export class PreviewService {
   }
 
   async exportSelection() {
-    async function saveImage(imageUrl: string, temporayDir: string, append: string) {
+    const imageDownloader = new url.ImageDownloader();
+    async function saveImage(imageUrl: string, temporaryDir: string, append: string) {
       const extension = imageUrl.split(/[#?]/)[0].split('.').pop().trim();
-      var request = require('request').defaults({ encoding: null });
-
-      function doRequest(url: string, filename: string) {
-        return new Promise(function (resolve, reject) {
-          request(url, function (error: any, res: any, body: any) {
-            if (!error && res.statusCode == 200) {
-              fs.writeFileSync(filename, body);
-              resolve(body);
-            } else {
-              reject(error);
-            }
-          });
-        });
-      }
-
-      if (imageUrl.startsWith("file://")) {
-        await fs.copyFile(url.decodeFile(imageUrl), `${temporayDir}${path.sep}${append}.${extension}`);
-      }
-      else {
-        await doRequest(imageUrl, `${temporayDir}${path.sep}${append}.${extension}`);
-      }
-
-      return `${append}.${extension}`;
+      const filename = `${append}.${extension}`;
+      await imageDownloader.downloadAndSaveImage(imageUrl, path.join(temporaryDir,filename))
+      return filename
     }
 
     const options: Electron.OpenDialogSyncOptions = {
@@ -766,7 +762,7 @@ export class PreviewService {
     if (result.filePaths !== undefined) {
       let timeout: any;
       try {
-        const packagePath = path.join(result.filePaths[0],"srm-image-choices-export/");
+        const packagePath = path.join(result.filePaths[0],"srm-image-choices");
         if(fs.existsSync(packagePath)) {
           fs.rmdirSync(packagePath, { recursive: true });
         }
@@ -791,15 +787,22 @@ export class PreviewService {
           for (const userId in this.previewData[directory]) {
             for (const appId in this.previewData[directory][userId].apps) {
               const app: PreviewDataApp = this.previewData[directory][userId].apps[appId];
+              const saveId = app.changedId ? app.changedId : appId;
               let selection: AppSelection = {
                 title: app.extractedTitle,
                 images: {}
               }
               for(const artworkType of artworkTypes) {
-                selection.images[artworkType] = appImage.getCurrentImage(app.images[artworkType], this.appImages[artworkType]) ? {
-                  pool: app.images[artworkType].imagePool,
-                  filename: await saveImage(appImage.getCurrentImage(app.images[artworkType], this.appImages[artworkType]).imageUrl, packagePath,`${app.extractedTitle}.${artworkType}`)
-                }: null;
+                if(appImage.getCurrentImage(app.images[artworkType], this.appImages[artworkType])) {
+                  const imageUrl = appImage.getCurrentImage(app.images[artworkType], this.appImages[artworkType]).imageUrl;
+                  const nintendoSucks = imageUrl.slice(-1) == '?';
+                  if(!nintendoSucks) {
+                    selection.images[artworkType] = {
+                      pool: app.images[artworkType].imagePool,
+                      filename: await saveImage(imageUrl, packagePath,`${saveId}.${artworkType}`)
+                    };
+                  }
+                }
               }
               apps.push(selection);
             }
@@ -847,10 +850,10 @@ export class PreviewService {
 
         for (const selection of selections) {
           for(const artworkType of artworkTypes) {
-            if(selection.images.grid) {
+            if(selection.images[artworkType]) {
               this.addUniqueImage(selection.images[artworkType].pool, {
                 imageProvider: 'LocalStorage',
-                imageUrl: url.encodeFile(`${packagePath}${path.sep}${selection.images[artworkType].filename}`),
+                imageUrl: url.encodeFile(path.join(packagePath, selection.images[artworkType].filename)),
                 loadStatus: 'done'
               }, artworkType);
             }

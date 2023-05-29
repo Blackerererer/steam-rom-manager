@@ -6,6 +6,8 @@ import { PreviewData, PreviewDataApp, PreviewDataApps, PreviewVariables, AppSett
 import { APP } from '../../variables';
 import { FileSelector } from '../../lib';
 import { artworkTypes, artworkViewTypes, artworkNamesDict, artworkDimsDict } from '../../lib/artwork-types';
+import { superTypes, ArtworkOnlyType } from '../../lib/parsers/available-parsers';
+import { FuzzyTestPipe, IntersectionTestPipe } from '../pipes';
 import * as url from '../../lib/helpers/url';
 import * as FileSaver from 'file-saver';
 import * as appImage from '../../lib/helpers/app-image';
@@ -48,6 +50,7 @@ export class PreviewComponent implements OnDestroy {
   private matchFixDict: {[sgdbId: string]: {name: string, posterUrl: string}};
   private detailsLoading: boolean = true;
   private showDetails: boolean = false;
+  private detailsSearchText: string = '';
 
   private showExcludes: boolean = false;
   private excludedAppIds: {
@@ -68,6 +71,8 @@ export class PreviewComponent implements OnDestroy {
     private renderer: Renderer2,
     private elementRef: ElementRef,
     private activatedRoute: ActivatedRoute,
+    private fuzzyTest: FuzzyTestPipe,
+    private intersectionTest: IntersectionTestPipe,
     private ipcService: IpcService
   ) {
     this.previewData = this.previewService.getPreviewData();
@@ -77,12 +82,6 @@ export class PreviewComponent implements OnDestroy {
       this.allParsers = this.previewService.getAllParsers();
       this.previewData = this.previewService.getPreviewData();
     }
-    this.subscriptions.add(this.previewService.getPreviewDataChange().subscribe(_.debounce(() => {
-      this.allCategories = this.previewService.getAllCategories();
-      this.allParsers = this.previewService.getAllParsers();
-      this.previewData = this.previewService.getPreviewData();
-      this.changeDetectionRef.detectChanges();
-    }, 50)));
     this.appSettings = this.settingsService.getSettings();
     this.imageTypes = artworkViewTypes.map((imageType: string)=>{
       return {value: imageType, displayValue: artworkNamesDict[imageType]}
@@ -127,6 +126,12 @@ export class PreviewComponent implements OnDestroy {
   }
 
   ngAfterViewInit() {
+    this.subscriptions.add(this.previewService.getPreviewDataChange().subscribe(_.debounce(() => {
+      this.allCategories = this.previewService.getAllCategories();
+      this.allParsers = this.previewService.getAllParsers();
+      this.previewData = this.previewService.getPreviewData();
+      this.changeDetectionRef.detectChanges();
+    }, 50)));
     this.subscriptions.add(this.CLI_MESSAGE.asObservable().subscribe((cliMessage: string)=> {
       const parsedCLI = cliMessage ? JSON.parse(cliMessage)||{} : {};
       let hasrun = false;
@@ -296,7 +301,19 @@ export class PreviewComponent implements OnDestroy {
         this.previewService.clearPreviewData();
     });
   }
-
+  private searchMatches(searchTitle: string) {
+    this.previewService.getMatchFixes(searchTitle).then((games: any[])=>{
+      this.matchFixDict = Object.fromEntries(games.map((x: any)=>[x.id.toString(), {name: x.name, posterUrl: x.posterUrl}]));
+      this.matchFixIds = games.map((x:any)=>x.id.toString());
+      this.detailsLoading = false;
+      this.changeDetectionRef.detectChanges();
+    })
+  }
+  private searchForDetails() {
+    if(this.detailsSearchText) {
+      this.searchMatches(this.detailsSearchText);
+    }
+  }
   private changeAppDetails(app: PreviewDataApp, steamDirectory: string, userId: string, appId: string) {
     this.detailsLoading = true;
     this.showDetails= true;
@@ -308,18 +325,14 @@ export class PreviewComponent implements OnDestroy {
       steamDirectory: steamDirectory,
       userId: userId
     };
-    this.previewService.getMatchFixes(this.detailsApp.app.extractedTitle).then((games: any[])=>{
-      this.matchFixDict = Object.fromEntries(games.map((x: any)=>[x.id.toString(), {name: x.name, posterUrl: x.posterUrl}]));
-      this.matchFixIds = games.map((x:any)=>x.id.toString());
-      this.detailsLoading = false;
-      this.changeDetectionRef.detectChanges();
-    })
+    this.searchMatches(this.detailsApp.app.extractedTitle);
   }
 
   private fixMatch(sgdbId: string) {
     this.matchFix = sgdbId;
   }
   private closeDetails() {
+    this.detailsSearchText = '';
     this.matchFix = '';
     this.detailsApp = undefined;
     this.showDetails = false;
@@ -342,7 +355,12 @@ export class PreviewComponent implements OnDestroy {
         this.previewData[steamDirectory][userId].apps[appId].images[artworkType].steam = undefined;
         this.previewService.updateAppImages(newPool, oldPool, artworkType)
       }
-      const exceptionId = steam.generateShortAppId(app.executableLocation, app.extractedTitle)
+      let exceptionId;
+      if(superTypes[ArtworkOnlyType].includes(app.parserType)) {
+        exceptionId = app.executableLocation.replace(/\"/g,"");
+      } else {
+        exceptionId = steam.generateShortAppId(app.executableLocation, app.extractedTitle)
+      }
       const exceptionKey = `${app.extractedTitle} \$\{id:${exceptionId}\}`;
       this.userExceptionsService.addException(exceptionKey, {
         newTitle: this.matchFixDict[this.matchFix].name,
@@ -356,7 +374,7 @@ export class PreviewComponent implements OnDestroy {
     }
   }
 
-  private excludeAppId(steamDirectory: string, userId: string, appId: string) {
+  private excludeAppId(steamDirectory: string, userId: string, appId: string, override?: boolean) {
     if(this.showExcludes) {
       if(!this.excludedAppIds[steamDirectory]) {
         this.excludedAppIds[steamDirectory] = {};
@@ -364,12 +382,50 @@ export class PreviewComponent implements OnDestroy {
       if(!this.excludedAppIds[steamDirectory][userId]) {
         this.excludedAppIds[steamDirectory][userId] = {};
       }
-      if(this.excludedAppIds[steamDirectory][userId][appId]) {
-        this.excludedAppIds[steamDirectory][userId][appId] = false;
-        this.exclusionCount -= 1;
+      if(override === undefined) {
+        if(this.excludedAppIds[steamDirectory][userId][appId]) {
+          this.excludedAppIds[steamDirectory][userId][appId] = false;
+          this.exclusionCount -= 1;
+        } else {
+          this.excludedAppIds[steamDirectory][userId][appId] = true;
+          this.exclusionCount += 1;
+        }
       } else {
-        this.excludedAppIds[steamDirectory][userId][appId] = true;
-        this.exclusionCount += 1;
+        if(!override != !this.excludedAppIds[steamDirectory][userId][appId]) {
+          this.exclusionCount += override ? 1 : -1;
+        }
+        this.excludedAppIds[steamDirectory][userId][appId] = override;
+      }
+    }
+  }
+
+  private isAppVisible(app: PreviewDataApp) {
+    const searchFilter = this.fuzzyTest.transform(app.title, this.filterValue);
+    const categoryFilter = this.intersectionTest.transform(app.steamCategories, this.actualCategoryFilter);
+    const configFilter = this.intersectionTest.transform([app.configurationTitle], this.actualParserFilter);
+    return searchFilter && categoryFilter && configFilter;
+  }
+
+  private excludeVisible() {
+    for(let steamDirectory in this.previewData) {
+      for(let userId in this.previewData[steamDirectory]) {
+        for(let appId in this.previewData[steamDirectory][userId].apps) {
+          if(this.isAppVisible(this.previewData[steamDirectory][userId].apps[appId])) {
+            this.excludeAppId(steamDirectory, userId, appId, true);
+          }
+        }
+      }
+    }
+  }
+
+  private includeVisible() {
+    for(let steamDirectory in this.previewData) {
+      for(let userId in this.previewData[steamDirectory]) {
+        for(let appId in this.previewData[steamDirectory][userId].apps) {
+          if(this.isAppVisible(this.previewData[steamDirectory][userId].apps[appId])) {
+            this.excludeAppId(steamDirectory, userId, appId, false);
+          }
+        }
       }
     }
   }

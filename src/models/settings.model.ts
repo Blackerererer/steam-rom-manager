@@ -16,6 +16,7 @@ export interface AppSettings {
   },
   environmentVariables: {
     steamDirectory: string,
+    userAccounts: string,
     romsDirectory: string,
     retroarchPath: string,
     localImagesDirectory: string,
@@ -25,6 +26,7 @@ export interface AppSettings {
   theme: string,
   offlineMode: boolean,
   enabledProviders: string[],
+  batchDownloadSize: number,
   previewSettings: PreviewSettings,
   navigationWidth: number,
   clearLogOnTest: boolean

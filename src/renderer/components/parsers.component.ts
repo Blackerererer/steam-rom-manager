@@ -35,6 +35,9 @@ export class ParsersComponent implements AfterViewInit, OnDestroy {
   private userForm: FormGroup;
   private formChanges: Subscription = new Subscription();
   private hiddenSections: {[parserId: string]: {[sectionName: string]: boolean}}
+  private chooseUserAccountsVisible: boolean = false;
+  private steamDirectoryForChooseAccounts: string = '';
+  private chooseAccountsControl: AbstractControl;
   private CLI_MESSAGE: BehaviorSubject<string> = new BehaviorSubject("");
 
   constructor(
@@ -90,9 +93,9 @@ export class ParsersComponent implements AfterViewInit, OnDestroy {
             this.currentDoc.content = this.lang.docs__md.configTitle.join('');
           }
         }),
-        steamDirectory: new NestedFormElement.Path({
+        steamDirectory: new NestedFormElement.Input({
+          path: { directory: true },
           placeholder: this.lang.placeholder.steamDirectory,
-          directory: true,
           required: true,
           label: this.lang.label.steamDirectory,
           highlight: this.highlight.bind(this),
@@ -100,6 +103,48 @@ export class ParsersComponent implements AfterViewInit, OnDestroy {
             onInfoClick: (self, path) => {
             this.currentDoc.activePath = path.join();
             this.currentDoc.content = this.lang.docs__md.steamDirectory.join('');
+          },
+          buttons: [
+            new NestedFormElement.Button({
+              buttonLabel: 'Global',
+              onClickControlMethod: (control: AbstractControl) => {
+                control.setValue('${steamdirglobal}')
+              }
+            })
+          ]
+        }),
+        userAccounts: new NestedFormElement.Group({
+          label: this.lang.label.userAccounts,
+          children: {
+            specifiedAccounts: new NestedFormElement.Input({
+              placeholder: this.lang.placeholder.userAccounts,
+              highlight: this.highlight.bind(this),
+              onValidateObservable: () => this.userForm.get('parserType').valueChanges,
+                onValidate: (self, path) => {
+                let serialized: {[k: string]: any} = {}
+                serialized[path[1]] = self.value
+                return this.parsersService.validate(path[0] as keyof UserConfiguration, serialized, {parserType: this.userForm.get('parserType').value});
+              },
+              buttons: [
+                new NestedFormElement.Button({
+                  buttonLabel: 'Choose',
+                  onClickControlMethod: (control: AbstractControl) => {
+                    this.chooseAccountsControl = control;
+                    this.chooseAccounts()
+                  }
+                }),
+                new NestedFormElement.Button({
+                  buttonLabel: 'Global',
+                  onClickControlMethod: (control: AbstractControl) => {
+                    control.setValue('${${accountsglobal}}')
+                  }
+                })
+              ]
+            })
+          },
+          onInfoClick: (self, path) => {
+            this.currentDoc.activePath = path.join();
+            this.currentDoc.content = this.lang.docs__md.userAccounts.join('');
           }
         }),
         steamCategory: new NestedFormElement.Input({
@@ -113,31 +158,11 @@ export class ParsersComponent implements AfterViewInit, OnDestroy {
             this.currentDoc.content = this.lang.docs__md.steamCategory.join('');
           }
         }),
-        userAccounts: new NestedFormElement.Group({
-          label: this.lang.label.userAccounts,
-          children: {
-            specifiedAccounts: new NestedFormElement.Input({
-
-              placeholder: this.lang.placeholder.userAccounts,
-              highlight: this.highlight.bind(this),
-              onValidateObservable: () => this.userForm.get('parserType').valueChanges,
-                onValidate: (self, path) => {
-                let serialized: {[k: string]: any} = {}
-                serialized[path[1]] = self.value
-                return this.parsersService.validate(path[0] as keyof UserConfiguration, serialized, {parserType: this.userForm.get('parserType').value});
-              }
-            })
-          },
-          onInfoClick: (self, path) => {
-            this.currentDoc.activePath = path.join();
-            this.currentDoc.content = this.lang.docs__md.userAccounts.join('');
-          }
-        }),
-        romDirectory: new NestedFormElement.Path({
+        romDirectory: new NestedFormElement.Input({
+          path: { directory: true },
           placeholder: this.lang.placeholder.romDirectory,
           required: true,
           isHidden: () => this.isHiddenIfNotRomsParser(),
-            directory: true,
           label: this.lang.label.romDirectory,
           highlight: this.highlight.bind(this),
           onValidate: (self, path) => this.parsersService.validate(path[0] as keyof UserConfiguration, self.value),
@@ -152,8 +177,9 @@ export class ParsersComponent implements AfterViewInit, OnDestroy {
         }),
         executable: new NestedFormElement.Group({
           isHidden: () => this.isHiddenIfNotRomsParser(),
-          children: {
-            path: new NestedFormElement.Path({
+            children: {
+            path: new NestedFormElement.Input({
+              path: { directory: false },
               label: this.lang.label.executableLocation,
               placeholder: this.lang.placeholder.executableLocation,
               required: true,
@@ -199,8 +225,8 @@ export class ParsersComponent implements AfterViewInit, OnDestroy {
             this.currentDoc.content = this.lang.docs__md.executableModifier.join('');
           }
         }),
-        startInDirectory: new NestedFormElement.Path({
-          directory: true,
+        startInDirectory: new NestedFormElement.Input({
+          path: { directory: true },
           placeholder: this.lang.placeholder.startInDirectory,
           label: this.lang.label.startInDirectory,
           highlight: this.highlight.bind(this),
@@ -224,36 +250,15 @@ export class ParsersComponent implements AfterViewInit, OnDestroy {
               let inputFieldName: keyof typeof parser.inputs;
               for (inputFieldName in parser.inputs) {
                 let input = parser.inputs[inputFieldName];
-                if(input.inputType == 'path' || input.inputType == 'dir') {
-                  parserInputs[inputFieldName] = new NestedFormElement.Path({
-                    placeholder: input.placeholder,
-                    required: !!input.required,
-                    directory: input.inputType=='dir' ? true : false,
-                    initialValue: input.forcedInput !== undefined ? input.forcedInput : null,
-                    highlight: this.highlight.bind(this),
-                    label: input.label,
-                    isHidden: () => {
-                      return concat(of(this.userForm.get('parserType').value), this.userForm.get('parserType').valueChanges).pipe(map((pType: string) => {
-                        return pType !== parsers[i];
-                      }));
-                    },
-                    onValidate: (self, path) => {
-                      if (parsers[i]!=='Steam' && this.userForm.get('parserType').value === parsers[i])
-                        return this.parsersService.validate(path[0] as keyof UserConfiguration, { parser: parsers[i], input: inputFieldName, inputData: self.value });
-                      else
-                        return null;
-                    },
-                    onInfoClick: (self, path) => {
-                      this.currentDoc.activePath = path.join();
-                      this.currentDoc.content = input.info;
-                    }
-                  })
-                } else if (input.inputType == 'text') {
+                if(['path','dir','text'].includes(input.inputType)) {
                   parserInputs[inputFieldName] = new NestedFormElement.Input({
-                    initialValue: input.forcedInput !== undefined ? input.forcedInput : null,
-                    highlight: this.highlight.bind(this),
+                    path: ['path','dir'].includes(input.inputType) ? {
+                      directory: input.inputType === 'dir'
+                    } : undefined,
                     placeholder: input.placeholder,
                     required: !!input.required,
+                    initialValue: input.forcedInput !== undefined ? input.forcedInput : null,
+                    highlight: this.highlight.bind(this),
                     label: input.label,
                     isHidden: () => {
                       return concat(of(this.userForm.get('parserType').value), this.userForm.get('parserType').valueChanges).pipe(map((pType: string) => {
@@ -292,7 +297,8 @@ export class ParsersComponent implements AfterViewInit, OnDestroy {
           });
         })(),
         titleSection: new NestedFormElement.Section({
-          label: 'Title Modification Configuration'
+          label: 'Title Modification Configuration',
+          isHidden: () => this.isHiddenIfArtworkOnlyParser(),
         }),
         titleFromVariable: new NestedFormElement.Group({
           isHidden: () => this.isHiddenIfNotRomsParser(),
@@ -324,6 +330,7 @@ export class ParsersComponent implements AfterViewInit, OnDestroy {
         }),
         titleModifier: new NestedFormElement.Input({
           highlight: this.highlight.bind(this),
+          isHidden: () => this.isHiddenIfArtworkOnlyParser(),
           placeholder: this.lang.placeholder.titleModifier,
           label: this.lang.label.titleModifier,
           onValidate: (self, path) => this.parsersService.validate(path[0] as keyof UserConfiguration, self.value),
@@ -334,6 +341,7 @@ export class ParsersComponent implements AfterViewInit, OnDestroy {
         }),
         fuzzyMatch: new NestedFormElement.Group({
           label: this.lang.label.fuzzyMatch,
+          isHidden: () => this.isHiddenIfArtworkOnlyParser(),
           children: {
             replaceDiacritics: new NestedFormElement.Toggle({
               text: this.lang.text.fuzzy_replaceDiacritic
@@ -351,169 +359,171 @@ export class ParsersComponent implements AfterViewInit, OnDestroy {
           }
         }),
         controllerSection: new NestedFormElement.Section({
-          label: 'Controller Templates Configuration'
-          // isHidden: () => this.isHiddenIfArtworkOnlyParser(),//only temporary, quite possible to add this for steam parser
+          label: 'Controller Templates Configuration',
+          isHidden: () => this.isHiddenIfArtworkOnlyParser()
         }),
-        fetchControllerTemplatesButton: new NestedFormElement.Button({
-          buttonLabel: 'Re-fetch Controller Templates',
-          onClickMethod: this.fetchControllerTemplates.bind(this)
-          // isHidden: () => this.isHiddenIfArtworkOnlyParser(),
-        }),
-        removeControllersButton: new NestedFormElement.Button({
-          buttonLabel: 'Unset Controllers for Parser',
-          onClickMethod: this.removeControllers.bind(this)
-          // isHidden: () => this.isHiddenIfArtworkOnlyParser(),
-        }),
-        controllers: new NestedFormElement.Group({
-          children: (() => {
-            let children: {[k: string]: any} = {};
-            for(let controllerType of controllerTypes) {
-              children[controllerType] = new NestedFormElement.Select({
-                // isHidden: () => this.isHiddenIfArtworkOnlyParser(),
-                label: controllerNames[controllerType as keyof typeof controllerNames]+ " " + "Template",
-                placeholder: 'Select a Template',
-                multiple: false,
-                allowEmpty: true,
-                values: [],
-                onInfoClick: (self, path) => {
-                  this.currentDoc.activePath = path.join();
-                  this.currentDoc.content = this.lang.docs__md.controllerTemplates.join('');
-                }
-              })
-            }
-            return children;
-          })()
-        }),
-        onlineImageSection: new NestedFormElement.Section({
-          label: 'Artwork Provider Configuration'
-        }),
-        imageProviders: new NestedFormElement.Select({
-          label: this.lang.label.imageProviders,
-          placeholder: this.lang.placeholder.imageProviders,
-          multiple: true,
-          allowEmpty: true,
-          values: this.imageProviderService.instance.getAvailableProviders(),
-          onValidate: (self, path) => this.parsersService.validate(path[0] as keyof UserConfiguration, self.value),
-            onInfoClick: (self, path) => {
-            this.currentDoc.activePath = path.join();
-            this.currentDoc.content = this.lang.docs__md.imageProviders.join('');
-          }
-        }),
-        imageProviderAPIs: (()=>{
-          let imageProviderAPIInputs: { [k: string]: NestedFormElement.Group } = {};
-          let providerNames = this.imageProviderService.instance.getAvailableProviders();
-          for (let i=0; i < providerNames.length; i++) {
-            let provider = this.imageProviderService.instance.getProviderInfo(providerNames[i]);
-            let providerL = this.imageProviderService.instance.getProviderInfoLang(providerNames[i]);
-            if (provider && provider.inputs !== undefined) {
-              imageProviderAPIInputs[providerNames[i]] = (()=>{
-                let apiInputs: {[k: string]: any} = {}
-                for (let inputFieldName in provider.inputs) {
-                  let input = provider.inputs[inputFieldName];
-                  if(input.inputType == 'toggle') {
-                    apiInputs[inputFieldName] = new NestedFormElement.Toggle({
-                      text: providerL.inputs[inputFieldName].label
-                    });
-                  }
-                  else if (input.inputType == 'multiselect') {
-                    apiInputs[inputFieldName] = new NestedFormElement.Select({
-                      label: providerL.inputs[inputFieldName].label,
-                      multiple: input.multiple,
-                      allowEmpty: input.allowEmpty,
-                      placeholder: this.lang.placeholder.multiAPIPlaceholder,
-                      values: input.allowedValues.map((option: string) => {return {
-                        value: option, displayValue: _.startCase(option.replace(/_/g," "))
-                      }}),
-                      onValidate: (self, path) => {
-                        return null;
-                      },
+          fetchControllerTemplatesButton: new NestedFormElement.Button({
+            buttonLabel: 'Re-fetch Controller Templates',
+            onClickMethod: this.fetchControllerTemplates.bind(this),
+            isHidden: () => this.isHiddenIfArtworkOnlyParser()
+          }),
+            removeControllersButton: new NestedFormElement.Button({
+              buttonLabel: 'Unset Controllers for Parser',
+              onClickMethod: this.removeControllers.bind(this),
+              isHidden: () => this.isHiddenIfArtworkOnlyParser()
+            }),
+              controllers: new NestedFormElement.Group({
+                children: (() => {
+                  let children: {[k: string]: any} = {};
+                  for(let controllerType of controllerTypes) {
+                    children[controllerType] = new NestedFormElement.Select({
+                      isHidden: () => this.isHiddenIfArtworkOnlyParser(),
+                        label: controllerNames[controllerType as keyof typeof controllerNames]+ " " + "Template",
+                      placeholder: 'Select a Template',
+                      multiple: false,
+                      allowEmpty: true,
+                      values: [],
                       onInfoClick: (self, path) => {
                         this.currentDoc.activePath = path.join();
-                        this.currentDoc.content = providerL.inputs[inputFieldName].info;
+                        this.currentDoc.content = this.lang.docs__md.controllerTemplates.join('');
                       }
                     })
                   }
+                  return children;
+                })()
+              }),
+              onlineImageSection: new NestedFormElement.Section({
+                label: 'Artwork Provider Configuration'
+              }),
+              imageProviders: new NestedFormElement.Select({
+                label: this.lang.label.imageProviders,
+                placeholder: this.lang.placeholder.imageProviders,
+                multiple: true,
+                allowEmpty: true,
+                values: this.imageProviderService.instance.getAvailableProviders(),
+                onValidate: (self, path) => this.parsersService.validate(path[0] as keyof UserConfiguration, self.value),
+                  onInfoClick: (self, path) => {
+                  this.currentDoc.activePath = path.join();
+                  this.currentDoc.content = this.lang.docs__md.imageProviders.join('');
+                }
+              }),
+              imageProviderAPIs: (()=>{
+                let imageProviderAPIInputs: { [k: string]: NestedFormElement.Group } = {};
+                let providerNames = this.imageProviderService.instance.getAvailableProviders();
+                for (let i=0; i < providerNames.length; i++) {
+                  let provider = this.imageProviderService.instance.getProviderInfo(providerNames[i]);
+                  let providerL = this.imageProviderService.instance.getProviderInfoLang(providerNames[i]);
+                  if (provider && provider.inputs !== undefined) {
+                    imageProviderAPIInputs[providerNames[i]] = (()=>{
+                      let apiInputs: {[k: string]: any} = {}
+                      for (let inputFieldName in provider.inputs) {
+                        let input = provider.inputs[inputFieldName];
+                        if(input.inputType == 'toggle') {
+                          apiInputs[inputFieldName] = new NestedFormElement.Toggle({
+                            text: providerL.inputs[inputFieldName].label
+                          });
+                        }
+                        else if (input.inputType == 'multiselect') {
+                          apiInputs[inputFieldName] = new NestedFormElement.Select({
+                            label: providerL.inputs[inputFieldName].label,
+                            multiple: input.multiple,
+                            allowEmpty: input.allowEmpty,
+                            placeholder: this.lang.placeholder.multiAPIPlaceholder,
+                            values: input.allowedValues.map((option: string) => {return {
+                              value: option, displayValue: _.startCase(option.replace(/_/g," "))
+                            }}),
+                            onValidate: (self, path) => {
+                              return null;
+                            },
+                            onInfoClick: (self, path) => {
+                              this.currentDoc.activePath = path.join();
+                              this.currentDoc.content = providerL.inputs[inputFieldName].info;
+                            }
+                          })
+                        }
+                      }
+                      return new NestedFormElement.Group({
+                        children: apiInputs
+                      })
+                    })();
+                  }
                 }
                 return new NestedFormElement.Group({
-                  children: apiInputs
+                  children: imageProviderAPIInputs
                 })
-              })();
-            }
-          }
-          return new NestedFormElement.Group({
-            children: imageProviderAPIInputs
-          })
-        })(),
-        onlineImageQueries: new NestedFormElement.Input({
-          label: this.lang.label.onlineImageQueries,
-          highlight: this.highlight.bind(this),
-          onValidate: (self, path) => this.parsersService.validate(path[0] as keyof UserConfiguration, self.value),
-            onInfoClick: (self, path) => {
-            this.currentDoc.activePath = path.join();
-            this.currentDoc.content = this.lang.docs__md.onlineImageQueries.join('');
-          }
-        }),
-        imagePool: new NestedFormElement.Input({
-          label: this.lang.label.imagePool,
-          highlight: this.highlight.bind(this),
-          onValidate: (self, path) => this.parsersService.validate(path[0] as keyof UserConfiguration, self.value),
-            onInfoClick: (self, path) => {
-            this.currentDoc.activePath = path.join();
-            this.currentDoc.content = this.lang.docs__md.imagePool.join('');
-          }
-        }),
-        localImageSection: new NestedFormElement.Section({
-          label: 'Local Artwork Configuration'
-        }),
-        defaultImage: (()=>{
-          let defaultImageInputs: { [k: string]: NestedFormElement.Path } = {};
-          for(const artworkType of artworkTypes) {
-            defaultImageInputs[artworkType] = new NestedFormElement.Path({
-              directory: false,
-              placeholder: this.lang.placeholder.defaultImage__i.interpolate({
-                artworkType: artworkSingDict[artworkType]
+              })(),
+              onlineImageQueries: new NestedFormElement.Input({
+                label: this.lang.label.onlineImageQueries,
+                highlight: this.highlight.bind(this),
+                onValidate: (self, path) => this.parsersService.validate(path[0] as keyof UserConfiguration, self.value),
+                  onInfoClick: (self, path) => {
+                  this.currentDoc.activePath = path.join();
+                  this.currentDoc.content = this.lang.docs__md.onlineImageQueries.join('');
+                }
               }),
-              highlight: this.highlight.bind(this),
-              label: this.lang.label.defaultImage__i.interpolate({
-                artworkType: artworkSingDict[artworkType]
+              imagePool: new NestedFormElement.Input({
+                label: this.lang.label.imagePool,
+                highlight: this.highlight.bind(this),
+                onValidate: (self, path) => this.parsersService.validate(path[0] as keyof UserConfiguration, self.value),
+                  onInfoClick: (self, path) => {
+                  this.currentDoc.activePath = path.join();
+                  this.currentDoc.content = this.lang.docs__md.imagePool.join('');
+                }
               }),
-              onValidate: (self, path) => this.parsersService.validate(path[0], self.value),
-                onInfoClick: (self, path) => {
-                this.currentDoc.activePath = path.join();
-                this.currentDoc.content = this.lang.docs__md.defaultImage.join('');
-              }
-            })
-          }
-          return new NestedFormElement.Group({
-            children: defaultImageInputs
-          })
-        })(),
-        localImages: (()=>{
-          let localImagesInputs: { [k: string]: NestedFormElement.Path } = {};
-          for(const artworkType of artworkTypes) {
-            localImagesInputs[artworkType] = new NestedFormElement.Path({
-              directory: true,
-              placeholder: this.lang.placeholder.localImages__i.interpolate({
-                artworkType: artworkNamesDict[artworkType].toLowerCase()
+              localImageSection: new NestedFormElement.Section({
+                label: 'Local Artwork Configuration'
               }),
-              appendGlob: '${title}.@(png|PNG|jpg|JPG|webp|WEBP)',
-              highlight: this.highlight.bind(this),
-              label: this.lang.label.localImages__i.interpolate({
-                artworkType: artworkNamesDict[artworkType].toLowerCase()
-              }),
-              onValidate: (self, path) => {
-                return this.parsersService.validate(path[0], self.value)
-              },
-              onInfoClick: (self, path) => {
-                this.currentDoc.activePath = path.join();
-                this.currentDoc.content = this.lang.docs__md.localImages.join('');
-              }
-            })
-          }
-          return new NestedFormElement.Group({
-            children: localImagesInputs
-          });
-        })()
+              defaultImage: (()=>{
+                let defaultImageInputs: { [k: string]: NestedFormElement.Input } = {};
+                for(const artworkType of artworkTypes) {
+                  defaultImageInputs[artworkType] = new NestedFormElement.Input({
+                    path: { directory: false },
+                    placeholder: this.lang.placeholder.defaultImage__i.interpolate({
+                      artworkType: artworkSingDict[artworkType]
+                    }),
+                    highlight: this.highlight.bind(this),
+                    label: this.lang.label.defaultImage__i.interpolate({
+                      artworkType: artworkSingDict[artworkType]
+                    }),
+                    onValidate: (self, path) => this.parsersService.validate(path[0], self.value),
+                      onInfoClick: (self, path) => {
+                      this.currentDoc.activePath = path.join();
+                      this.currentDoc.content = this.lang.docs__md.defaultImage.join('');
+                    }
+                  })
+                }
+                return new NestedFormElement.Group({
+                  children: defaultImageInputs
+                })
+              })(),
+              localImages: (()=>{
+                let localImagesInputs: { [k: string]: NestedFormElement.Input } = {};
+                for(const artworkType of artworkTypes) {
+                  localImagesInputs[artworkType] = new NestedFormElement.Input({
+                    path: {
+                      directory: true,
+                      appendGlob: '${title}.@(png|PNG|jpg|JPG|webp|WEBP)'
+                    },
+                    placeholder: this.lang.placeholder.localImages__i.interpolate({
+                      artworkType: artworkNamesDict[artworkType].toLowerCase()
+                    }),
+                    highlight: this.highlight.bind(this),
+                    label: this.lang.label.localImages__i.interpolate({
+                      artworkType: artworkNamesDict[artworkType].toLowerCase()
+                    }),
+                    onValidate: (self, path) => {
+                      return this.parsersService.validate(path[0], self.value)
+                    },
+                    onInfoClick: (self, path) => {
+                      this.currentDoc.activePath = path.join();
+                      this.currentDoc.content = this.lang.docs__md.localImages.join('');
+                    }
+                  })
+                }
+                return new NestedFormElement.Group({
+                  children: localImagesInputs
+                });
+              })()
       }
     });
   }
@@ -649,7 +659,6 @@ export class ParsersComponent implements AfterViewInit, OnDestroy {
 
   private highlight(input: string, tag: string) {
     let output = '';
-
     if (this.vParser.setInput(input).parse()) {
       this.vParser.traverseAST((ast, item, level, passedData: string[]) => {
         if (level === 0) {
@@ -674,7 +683,6 @@ export class ParsersComponent implements AfterViewInit, OnDestroy {
     }
     else
       output = input;
-
     return output;
   }
   private presetsInfoClick() {
@@ -757,7 +765,7 @@ export class ParsersComponent implements AfterViewInit, OnDestroy {
             if (item instanceof NestedFormElement.Group) {
               iterateGroup(item, itemPath);
             }
-            else if (item instanceof NestedFormElement.Input || item instanceof NestedFormElement.Path) {
+            else if (item instanceof NestedFormElement.Input) {
               let title = item.label;
               if (title)
                 text += `# ${title}\r\n`;
@@ -865,6 +873,7 @@ export class ParsersComponent implements AfterViewInit, OnDestroy {
           this.loggerService.info('');
           success('');
           success('Number of Titles: '.concat(data.files.length.toString()));
+          data.files = data.files.sort((a,b)=> a.extractedTitle.localeCompare(b.extractedTitle));
           for (let i = 0; i < data.files.length; i++) {
             success('');
             const executableLocation = data.files[i].modifiedExecutableLocation;
@@ -1109,6 +1118,25 @@ export class ParsersComponent implements AfterViewInit, OnDestroy {
         this.markAsDirtyDeep(control.get(childKey) as FormGroup);
       }
     }
+  }
+
+  chooseAccounts() {
+    let steamDirInput = this.userForm.get('steamDirectory').value || '';
+    let steamDir = this.parsersService.parseSteamDir(steamDirInput);
+    if(this.parsersService.validate('steamDirectory', steamDir) == null) {
+      this.chooseUserAccountsVisible = true;
+      this.steamDirectoryForChooseAccounts = steamDir;
+    }
+  }
+
+  setUserAccounts(accounts: string) {
+    if(accounts && this.chooseAccountsControl) {
+      this.chooseAccountsControl.setValue(accounts)
+    }
+  }
+
+  exitChooseAccounts() {
+    this.chooseUserAccountsVisible = false;
   }
 
   ngOnDestroy() {

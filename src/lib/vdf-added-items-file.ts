@@ -9,7 +9,7 @@ import * as path from 'path';
 export class VDF_AddedItemsFile {
   private fileData: VDF_AddedItemsData = undefined;
 
-  constructor(private filepath: string) { }
+  constructor(private filePath: string) { }
 
   get data() {
     return this.fileData;
@@ -28,39 +28,74 @@ export class VDF_AddedItemsFile {
   }
 
   read() {
-    return json.read<string[]>(this.filepath, []).then((data) => {
-      this.fileData = {};
-      for (let i = 0; i < data.length; i++) {
-        if(data[i].includes("_")) {
-          this.fileData[data[i].split('_')[0]] = data[i].split('_')[1];
-        } else {
-          this.fileData[data[i]] = '-legacy-';
+    const modifierLatest = 2;
+    const modifier = {
+      "0": {
+        method: (readData: any) => {
+          return {
+            version: 1,
+            addedApps: Object.fromEntries(readData.map((x: string)=>[x.split('_')[0], {
+              parserId: x.split('_')[1],
+              artworkOnly: (x.split('_')[0].length < 17)
+            }]))
+          }
+        }
+      },
+      "1": {
+        method:(readData: any) => {
+          const addedApps = _.cloneDeep(readData.addedApps);
+          const entries = Object.entries(addedApps).map(([k, v]: [k: string, v: any])=>[k, {...v, categories: []}]);
+          const addedAppsWithCats = Object.fromEntries(entries);
+          const result = {
+            version: 2,
+            addedApps: addedAppsWithCats
+          }
+          return result
         }
       }
+    }
+    return json.read<any>(this.filePath, {}).then((readData) => {
+      let controlVersion;
+      if(Array.isArray(readData) || !readData.version) {
+        controlVersion = 0;
+      } else {
+        controlVersion = readData.version
+      }
+      let result = _.cloneDeep(readData);
+      for(let j = controlVersion; j < modifierLatest; j++) {
+        result = modifier[j.toString() as keyof typeof modifier].method(result);
+      }
+      this.fileData = result;
       return this.data;
     }).catch((error) => {
-      this.fileData = {};
+      this.fileData = {version: modifierLatest, addedApps: {}};
     });
   }
 
   write() {
-    this.fileData = _.pickBy(this.fileData, item => item !== undefined);
-    let app_ids = Object.keys(this.fileData).filter((app_id:string) => this.fileData[app_id]!=='-legacy-');
-    let data = app_ids.map((app_id:string)=>app_id.concat('_',this.fileData[app_id])) //data was just keys
-    return json.write(this.filepath, data);
+    this.fileData.addedApps = _.pickBy(this.fileData.addedApps, item => item !== undefined);
+    return json.write(this.filePath, this.fileData);
   }
 
   getItem(appId: string){
-    return this.fileData[appId];
+    return this.fileData.addedApps[appId];
   }
 
   removeItem(appId: string){
-    if (this.fileData[appId] !== undefined){
-      this.fileData[appId] = undefined;
+    if (this.fileData.addedApps[appId] !== undefined){
+      this.fileData.addedApps[appId] = undefined;
     }
   }
 
-  addItem(appId: string, parserId: string) {
-    this.fileData[appId] = parserId;
+  clear() {
+    this.fileData.addedApps = {};
+  }
+
+  addItem(appId: string, parserId: string, artworkOnly: boolean, categories: string[]) {
+    this.fileData.addedApps[appId] = {
+      parserId: parserId,
+      artworkOnly: artworkOnly,
+      categories: categories
+    };
   }
 }

@@ -19,16 +19,18 @@ export class SettingsComponent implements OnDestroy {
   private currentDoc: { activePath: string, content: string } = { activePath: '', content: '' };
   private settings: AppSettings;
   private availableProviders: string[];
+  private availableBatches: {displayValue: string, value: number}[];
   private themes: string[];
   private availableLanguages: SelectItem[];
   private knownSteamDirectories: string[];
   private retroarchPathPlaceholder: string;
   private steamDirectoryPlaceholder: string;
+  private userAccountsPlaceholder: string;
   private romsDirectoryPlaceholder: string;
   private localImagesDirectoryPlaceholder: string;
   private raCoresDirectoryPlaceholder: string;
+  private chooseUserAccountsVisible: boolean = false;
   private CLI_MESSAGE: BehaviorSubject<string> = new BehaviorSubject("");
-
   constructor(private settingsService: SettingsService,
     private fuzzyService: FuzzyService,
     private languageService: LanguageService,
@@ -61,11 +63,15 @@ export class SettingsComponent implements OnDestroy {
       this.knownSteamDirectories = this.parsersService.getKnownSteamDirectories();
     }));
     this.settings = this.settingsService.getSettings();
+    this.availableBatches = [10, 20, 50, 100, 200, 500].map(x=>{
+      return {value: x, displayValue: x.toString()}
+    })
     this.availableProviders = this.imageProviderService.instance.getAvailableProviders();
     this.availableLanguages = this.languageService.getAvailableLanguages().map((lang)=>{
       return {value: lang, displayValue: this.languageService.getReadableName(lang)}
     });
     this.themes = availableThemes;
+    this.userAccountsPlaceholder = this.lang.placeholder.userAccounts;
     if(os.type()=='Windows_NT'){
       this.retroarchPathPlaceholder = this.lang.placeholder.retroarchPathWin;
       this.steamDirectoryPlaceholder = this.lang.placeholder.steamDirectoryWin;
@@ -119,17 +125,31 @@ export class SettingsComponent implements OnDestroy {
 
   private removeApps() {
     if (this.knownSteamDirectories.length > 0) {
-      return this.previewService.saveData({removeAll: true, batchWrite: false});
+      return this.previewService.saveData({removeAll: true, batchWrite: false})
+      .then(() => {
+        this.removeCategoriesOnly();
+      })
+      .then(() => {
+        this.removeControllersOnly();
+      });
     }
   }
 
-  private removeControllersOnly() {
+  private async removeCategoriesOnly() {
     for(let steamDir of this.knownSteamDirectories) {
-      steam.getAvailableLogins(steamDir).then((accounts: userAccountData[])=>{
-        for(let account of accounts) {
-          this.parsersService.removeControllers(steamDir, account.accountID);
-        }
-      })
+      const accounts = await steam.getAvailableLogins(steamDir);
+      for(let account of accounts) {
+        await this.previewService.removeCategories(steamDir, account.accountID)
+      }
+    }
+  }
+
+  private async removeControllersOnly() {
+    for(let steamDir of this.knownSteamDirectories) {
+      const accounts = await steam.getAvailableLogins(steamDir);
+      for(let account of accounts) {
+        await this.parsersService.removeControllers(steamDir, account.accountID);
+      }
     }
   }
 
@@ -160,5 +180,19 @@ export class SettingsComponent implements OnDestroy {
 
   configDir() {
     this.settingsService.configDir();
+  }
+
+  chooseAccounts() {
+    if(this.settings.environmentVariables.steamDirectory) {
+      this.chooseUserAccountsVisible = true;
+    }
+  }
+  setUserAccounts(accounts: string) {
+    if(accounts) {
+      this.settings.environmentVariables.userAccounts = accounts;
+    }
+  }
+  exitChooseAccounts() {
+    this.chooseUserAccountsVisible = false;
   }
 }

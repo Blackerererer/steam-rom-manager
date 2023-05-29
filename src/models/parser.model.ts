@@ -35,7 +35,7 @@ export interface ParsedUserConfigurationFile extends StringMap {
 export interface ParsedUserConfiguration {
   configurationTitle: string,
   parserId: string,
-  parserType: string,
+  parserType: ParserType,
   imageProviders: string[],
   imageProviderAPIs: ImageProviderAPI,
   controllers: Controllers,
@@ -86,6 +86,7 @@ export interface ParserVariableData {
   filePath: string,
   steamDirectoryGlobal: string,
   romsDirectoryGlobal: string,
+  userAccountsGlobal: string,
   retroarchPath: string,
   raCoresDirectory: string,
   localImagesDirectory: string
@@ -97,7 +98,7 @@ const nameVariables = StringLiteralArray(['EXENAME','FILENAME']);
 const extensionVariables = StringLiteralArray(['EXEEXT','FILEEXT']);
 const pathVariables = StringLiteralArray(['EXEPATH','FILEPATH']);
 const parserVariables = StringLiteralArray(['TITLE','FUZZYTITLE','FINALTITLE']);
-const environmentVariables = StringLiteralArray(['/','SRMDIR','STEAMDIRGLOBAL','ROMSDIRGLOBAL','RETROARCHPATH','RACORES','LOCALIMAGESDIR']);
+const environmentVariables = StringLiteralArray(['/','SRMDIR','STEAMDIRGLOBAL','ACCOUNTSGLOBAL','ROMSDIRGLOBAL','RETROARCHPATH','RACORES','LOCALIMAGESDIR']);
 
 export type DirectoryVariables = (typeof directoryVariables)[number];
 export type NameVariables = (typeof nameVariables)[number];
