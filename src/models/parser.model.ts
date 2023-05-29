@@ -109,7 +109,7 @@ export type EnvironmentVariables = (typeof environmentVariables)[number];
 
 
 
-export type ParserType = 'Glob' | 'Glob-regex' | 'Manual' | 'Amazon Games' | 'Epic' | 'Legendary' | 'GOG Galaxy' | 'itch.io' | 'Steam' | 'UPlay' | 'UWP' | 'EA Desktop';
+export type ParserType = 'Glob' | 'Glob-regex' | 'Manual' | 'Amazon Games' | 'Epic' | 'Legendary' | 'GOG Galaxy' | 'itch.io' | 'Steam' | 'UPlay' | 'UWP' | 'EA Desktop' | 'ScummVM';
 export type SuperType = 'Manual'|'ArtworkOnly'|'ROM'|'Platform';
 
 export interface ParserInfo {
