@@ -3,7 +3,7 @@ import Ajv, {ValidateFunction, Options} from "ajv";
 import * as _ from "lodash";
 
 export class Validator<T = object> {
-  private ajv: Ajv;
+  private ajv: Ajv.Ajv;
   private validationFn: ValidateFunction | null = null;
   private modifier: ValidatorModifier<T> | null = null;
 
